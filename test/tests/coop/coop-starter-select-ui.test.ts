@@ -167,11 +167,14 @@ describe("co-op starter select phase", () => {
   it("adds the co-op controls to the screen only in a lobby", async () => {
     const game = new GameManager(phaserGame);
     const container = game.scene.add.container(0, 0);
-    const add = vi.spyOn(container, "add");
+    const above = game.scene.add.container(0, 0);
+    container.add(above);
+    const add = vi.spyOn(container, "addAt");
     const layout = {
       iconPosition: (i: number): [number, number] => [0, i * 10],
       slotIcons: [],
       statusPosition: [0, 0] as [number, number],
+      drawBelow: above,
     };
     expect(createCoopStarterSelectUi(container, layout, () => {})).toBeNull();
     expect(add).not.toHaveBeenCalled();

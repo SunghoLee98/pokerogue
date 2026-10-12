@@ -113,7 +113,10 @@ export interface CoopStarterSelectLayout {
   iconPosition(index: number): [x: number, y: number];
   /** The screen's own team slot icons (0-5); the free ones show the empty-slot placeholder */
   slotIcons: readonly Phaser.GameObjects.Sprite[];
+  /** Right edge and top of the status text */
   statusPosition: [x: number, y: number];
+  /** The co-op objects are drawn just below this child of the container, so the screen's later layers cover them */
+  drawBelow: Phaser.GameObjects.GameObject;
 }
 
 /** Draws the partner's picks as icons in the free team slots and the status as text. */
@@ -132,7 +135,7 @@ class PhaserCoopPartnerView implements CoopPartnerView {
     }
     const [x, y] = layout.statusPosition;
     this.status = addTextObject(x, y, "", TextStyle.TOOLTIP_CONTENT, { fontSize: "42px" }).setOrigin(1, 0);
-    container.add([...this.icons, this.status]);
+    container.addAt([...this.icons, this.status], container.getIndex(layout.drawBelow));
   }
 
   setPartner(picks: readonly CoopStarterPayload[]): void {

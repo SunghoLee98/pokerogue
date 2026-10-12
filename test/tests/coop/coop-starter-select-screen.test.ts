@@ -61,7 +61,11 @@ describe("co-op on the starter select screen", () => {
       { role: "guest", transport: pair.guest, peerAccountName: "Hosty" },
       { getAccount: () => emptySnapshot },
     );
+    const container = handler["starterSelectContainer"];
+    const before = new Set(container.list);
+    const addText = vi.spyOn(game.scene.add, "text");
     handler["setUpCoop"]();
+    const added = container.list.filter(child => !before.has(child));
     handler["partyStarters"].push(starter(SpeciesId.CHARMANDER));
     handler.partyStarterIds.push(SpeciesId.CHARMANDER);
 
@@ -78,7 +82,7 @@ describe("co-op on the starter select screen", () => {
       return Promise.resolve();
     });
     vi.spyOn(ui, "setMode").mockResolvedValue();
-    return { pair, lobby, confirms };
+    return { pair, lobby, confirms, added, addText };
   }
 
   const messageBoxVisible = () => handler["starterSelectMessageBoxContainer"].visible;
@@ -129,5 +133,27 @@ describe("co-op on the starter select screen", () => {
     handler["coopUi"]?.destroy();
     handler["coopUi"] = null;
     expect(visible()).toEqual([true, true, true]);
+  });
+
+  it("keeps the co-op status clear of the message box", async () => {
+    const { added, addText } = await setUp();
+    const container = handler["starterSelectContainer"];
+    const messageBox = handler["starterSelectMessageBoxContainer"];
+    const status = added.find(child => "setText" in child);
+    expect(status).toBeDefined();
+
+    // Drawn under the message box and the overlays, so they cover it rather than the other way round
+    expect(added).toHaveLength(4);
+    for (const child of added) {
+      for (const above of [messageBox, handler["filterBar"], handler["moveInfoOverlay"]]) {
+        expect(container.getIndex(child)).toBeLessThan(container.getIndex(above));
+      }
+    }
+    // ... and above a one-line message box (the start prompt), so it stays readable while answering
+    // (headless text objects do not keep their position, so this reads the one they were created at)
+    const statusCall = addText.mock.results.findIndex(result => result.value === status);
+    const [, statusY] = addText.mock.calls[statusCall];
+    const oneLineMessageBoxTop = game.scene.scaledCanvas.height - 1 - 28;
+    expect(statusY + 7).toBeLessThanOrEqual(oneLineMessageBoxTop);
   });
 });

@@ -634,7 +634,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const coopLayout: CoopStarterSelectLayout = {
       iconPosition: i => [teamWindowX + 7, calcStarterIconY(i)],
       slotIcons: this.partyIcons,
-      statusPosition: [teamWindowX - 4, 162],
+      // Bottom right of the starter grid, left of its scroll bar and just above a one-line message box
+      statusPosition: [teamWindowX - 11, 144],
+      // Above the team column and the starter grid, below the panels, overlays and message box drawn after them
+      drawBelow: this.starterSummary,
     };
     this.coopUi = createCoopStarterSelectUi(this.starterSelectContainer, coopLayout, starters => {
       this.getUi().setMode(UiMode.STARTER_SELECT);
