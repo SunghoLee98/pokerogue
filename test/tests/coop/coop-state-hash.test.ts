@@ -11,6 +11,7 @@ import { BattlerIndex } from "#enums/battler-index";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
+import { createTestStarterPayload, toCoopRewardScreen } from "#test/utils/coop-replay";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -46,6 +47,7 @@ function state(): CoopStateSnapshot {
     enemyModifiers: [],
     weather: 0,
     terrain: 0,
+    rewardOptions: [],
   };
 }
 
@@ -69,6 +71,7 @@ describe("coop-state-hash", () => {
         s => (s.rngState = "!rnd,1,2,3,5"),
         s => (s.money = 999),
         s => (s.playerField = [2, 1]),
+        s => (s.rewardOptions = ["EXP_SHARE"]),
       ];
       for (const change of changes) {
         const changed = state();
@@ -130,6 +133,35 @@ describe("coop-state-hash", () => {
       } finally {
         setCoopSession(null);
       }
+    });
+
+    it("includes the offered rewards while a co-op reward screen is open", async () => {
+      game.override
+        .disableTrainerWaves()
+        .startingLevel(100)
+        .enemyLevel(5)
+        .moveset([MoveId.HYPER_VOICE, MoveId.SPLASH])
+        .itemRewards([{ name: "EXP_SHARE" }, { name: "LEFTOVERS" }, { name: "EXP_SHARE" }]);
+      const snapshot = { trainerId: 1, secretId: 0, caughtSpecies: [], eggMoves: {}, unlocks: [] };
+      try {
+        await toCoopRewardScreen(game, "host", 3, {
+          seed: "coop-hash",
+          accounts: { host: snapshot, guest: snapshot },
+          picks: {
+            host: [createTestStarterPayload(SpeciesId.BULBASAUR)],
+            guest: [createTestStarterPayload(SpeciesId.CHARMANDER)],
+          },
+          timedEvent: null,
+        });
+        expect(captureCoopState().rewardOptions).toEqual(["EXP_SHARE", "LEFTOVERS", "EXP_SHARE"]);
+      } finally {
+        setCoopSession(null);
+      }
+    });
+
+    it("has no offered rewards in battle", async () => {
+      await game.classicMode.startBattle(SpeciesId.BULBASAUR, SpeciesId.CHARMANDER);
+      expect(captureCoopState().rewardOptions).toEqual([]);
     });
 
     it("is stable when nothing happens", async () => {

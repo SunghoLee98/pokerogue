@@ -479,6 +479,7 @@ async function inputRewards(
   options: CoopReplayOptions,
   log: CoopReplayLog,
   partner: CoopTestPartner,
+  checkpoint: () => void,
 ): Promise<void> {
   const { role, remote } = options;
   const by: CoopRole = role === "host" ? "guest" : "host";
@@ -491,6 +492,10 @@ async function inputRewards(
     log.inputs.push({ by, wave, turn: REWARD_TURN, message });
     partner.send(message);
   };
+
+  // Both runs hash the first screen (with its offered rewards) before anyone acts on it.
+  await toRewardScreen(game, first);
+  checkpoint();
 
   if ("log" in remote) {
     const recorded = remote.log.inputs.filter(i => i.by === by && i.message.t === "reward" && i.message.wave === wave);
@@ -624,7 +629,7 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
           await game.phaseInterceptor.to("TurnInitPhase");
           await game.phaseInterceptor.to("CommandPhase");
         } else {
-          await inputRewards(game, options, log, partner);
+          await inputRewards(game, options, log, partner, checkpoint);
           await new Promise(resolve => setTimeout(resolve, 0));
           collectSent();
         }

@@ -8,6 +8,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import type { CoopRole } from "#coop/coop-protocol";
+import { getCoopRewardOptionIds } from "#coop/coop-reward";
 import { coopSession } from "#coop/coop-session";
 import type { Pokemon } from "#field/pokemon";
 import type { PersistentModifier } from "#modifiers/modifier";
@@ -52,6 +53,8 @@ export interface CoopStateSnapshot {
   weather: number;
   /** `TerrainType`, `0` if none */
   terrain: number;
+  /** Type ids of the free rewards offered on the open co-op reward screen, empty if none is open */
+  rewardOptions: string[];
 }
 
 function capturePokemon(pokemon: Pokemon): CoopPokemonState {
@@ -95,6 +98,7 @@ export function captureCoopState(scene: BattleScene = globalScene): CoopStateSna
     enemyModifiers: scene.findModifiers(() => true, false).map(captureModifier),
     weather: scene.arena.weather?.weatherType ?? 0,
     terrain: scene.arena.terrain?.terrainType ?? 0,
+    rewardOptions: getCoopRewardOptionIds(),
   };
 }
 
