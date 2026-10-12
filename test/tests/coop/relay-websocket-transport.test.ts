@@ -11,7 +11,11 @@ class FakeSocket {
   onmessage: ((event: { data: unknown }) => void) | null = null;
   onclose: (() => void) | null = null;
 
-  constructor(readonly url: string) {}
+  readonly url: string;
+
+  constructor(url: string) {
+    this.url = url;
+  }
 
   send(data: string): void {
     this.sent.push(data);
