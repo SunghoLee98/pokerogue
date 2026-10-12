@@ -1,6 +1,7 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { coopExcludesLures } from "#coop/coop-reward";
 import { getWorldSimData } from "#coop/coop-sim-data";
 import { modifierTypes } from "#data/data-lists";
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
@@ -842,6 +843,9 @@ function skipInLastClassicWaveOrDefault(defaultWeight: number): WeightedModifier
  */
 function lureWeightFunc(maxBattles: number, weight: number): WeightedModifierTypeWeightFunc {
   return () => {
+    if (coopExcludesLures()) {
+      return 0;
+    }
     const lures = globalScene.getModifiers(DoubleBattleChanceBoosterModifier);
     return !(globalScene.gameMode.isClassic && globalScene.currentBattle.waveIndex === 199)
       && (lures.length === 0
