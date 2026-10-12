@@ -29,6 +29,7 @@ import { UiInputs } from "#app/ui-inputs";
 import { STARTING_WAVE } from "#balance/misc";
 import { FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
 import { coopForcesDouble } from "#coop/coop-battle-rules";
+import { isCoopExcludedEncounter } from "#coop/coop-encounter";
 import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets } from "#data/battle-anims";
 import { getDailyMysteryEncounter } from "#data/daily-run";
 import { allMoves, biomeDepths, modifierTypes } from "#data/data-lists";
@@ -3569,7 +3570,9 @@ export class BattleScene extends SceneBase {
     const previousEncounter = this.mysteryEncounterSaveData.encounteredEvents.at(-1)?.type ?? null; // TODO: This being `null` is a bit weird
     const disabledEncounters = timedEventManager.getEventMysteryEncountersDisabled();
     const biomeMysteryEncounters =
-      mysteryEncountersByBiome.get(this.arena.biomeId)?.filter(enc => !disabledEncounters.includes(enc)) ?? [];
+      mysteryEncountersByBiome
+        .get(this.arena.biomeId)
+        ?.filter(enc => !disabledEncounters.includes(enc) && !isCoopExcludedEncounter(enc)) ?? [];
     // If no valid encounters exist at tier, checks next tier down, continuing until there are some encounters available
     while (availableEncounters.length === 0 && tier !== null) {
       availableEncounters = biomeMysteryEncounters
