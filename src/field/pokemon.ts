@@ -18,6 +18,7 @@ import { FusionSpeciesFormEvolution, SpeciesFormEvolution, validateShedinjaEvo }
 import { BASE_HIDDEN_ABILITY_RATE, BASE_SHINY_CHANCE, SHINY_EPIC_CHANCE, SHINY_VARIANT_CHANCE } from "#balance/rates";
 import type { FORCED_RIVAL_SIGNATURE_MOVES } from "#balance/signature-moves";
 import { getStarterValueFriendshipCap, TRAINER_MAX_FRIENDSHIP_WAVE, TRAINER_MIN_FRIENDSHIP } from "#balance/starters";
+import { getPokemonSimData, getWorldSimData } from "#coop/coop-sim-data";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
 import { NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
 import {
@@ -1908,7 +1909,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     if (species in speciesEggMoves) {
       for (let i = 0; i < 4; i++) {
-        if (globalScene.gameData.starterData[species].eggMoves & (1 << i)) {
+        if (getPokemonSimData(this.id).getEggMoveBits(species) & (1 << i)) {
           moves.push(speciesEggMoves[species][i]);
         }
       }
@@ -3034,7 +3035,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const rand1 = (this.id & 0xffff0000) >>> 16;
     const rand2 = this.id & 0x0000ffff;
 
-    const E = globalScene.gameData.trainerId ^ globalScene.gameData.secretId;
+    const { trainerId, secretId } = getWorldSimData();
+    const E = trainerId ^ secretId;
     const F = rand1 ^ rand2;
 
     const shinyThreshold = new NumberHolder(BASE_SHINY_CHANCE);
