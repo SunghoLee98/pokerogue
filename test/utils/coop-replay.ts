@@ -18,11 +18,13 @@ import { createCoopGameMode, startCoopRun } from "#coop/coop-game-start";
 import type {
   CoopAccountSnapshot,
   CoopMessage,
+  CoopRewardAction,
   CoopRole,
   CoopStarterPayload,
   CoopTurnCommandPayload,
 } from "#coop/coop-protocol";
-import { setCoopSession } from "#coop/coop-session";
+import { getCoopRewardGen, submitCoopRewardAction } from "#coop/coop-reward";
+import { coopSession, setCoopSession } from "#coop/coop-session";
 import { createAccountSnapshot } from "#coop/coop-sim-data";
 import { CoopStarterSelection, type CoopStartInfo } from "#coop/coop-starter-selection";
 import { type CoopStateSnapshot, captureCoopState, hashCoopState } from "#coop/coop-state-hash";
@@ -41,6 +43,7 @@ import type { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { Unlockables } from "#enums/unlockables";
 import type { CommandPhase } from "#phases/command-phase";
+import type { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import type { GameData } from "#system/game-data";
 import { GameManager } from "#test/framework/game-manager";
@@ -96,6 +99,9 @@ export interface CoopTestAccount {
   eggMoves: Partial<Record<SpeciesId, number>>;
 }
 
+/** What each player does on a wave's reward screen, in order (a reroll moves on to the next screen). */
+export type CoopReplayRewardFn = (wave: number) => Partial<Record<CoopRole, CoopRewardAction[]>>;
+
 /** A player's inputs for a turn, in the order they make them (for example a declined flee, then a move). */
 export type CoopReplayCommandFn = (wave: number, turn: number) => CoopReplayAction | CoopReplayAction[];
 
@@ -117,6 +123,8 @@ export interface CoopReplayOptions {
   waves: number;
   /** Stop after this many turns even if the waves are not finished */
   turns?: number;
+  /** Reward screen actions per wave. Default: the wave's picker skips the reward, the other player does nothing */
+  rewards?: CoopReplayRewardFn;
   /** Runs once the battle has started, before the first input (both runs must do the same) */
   onStart?: (game: GameManager) => void;
   /** The shared seed; both runs must use the same one. Default `"coop-replay"` */
@@ -415,6 +423,108 @@ function inputTurn(game: GameManager, options: CoopReplayOptions, log: CoopRepla
   queueLocalActions(game, role, [localCommand(wave, turn)].flat());
 }
 
+/** Where reward screen messages are filed: they belong to the wave, not to a turn. */
+const REWARD_TURN = 0;
+
+/** Wait until the reward screen with this number is open, running the phases up to it. */
+async function toRewardScreen(game: GameManager, gen: number): Promise<SelectModifierPhase> {
+  for (;;) {
+    const phase = game.scene.phaseManager.getCurrentPhase();
+    if (phase.is("SelectModifierPhase") && getCoopRewardGen() === gen) {
+      return phase;
+    }
+    if (getCoopRewardGen() > gen) {
+      throw new Error(`reward screen ${gen} closed before the local actions were made`);
+    }
+    await game.phaseInterceptor.to("SelectModifierPhase");
+  }
+}
+
+/** The screen number each action is made on, the first one on `first`: a reroll opens the next screen. */
+function screensFor(actions: CoopRewardAction[], first: number): number[] {
+  let gen = first;
+  return actions.map(action => (action.kind === "reroll" ? gen++ : gen));
+}
+
+/**
+ * Make both players' reward screen actions for the wave that just ended, then go on to the next wave.
+ * The partner's: made up as the guest's requests when recording as the host (the host numbers them), or the recorded
+ * host's numbered events when replaying as the guest. A recorded event for one of the local player's own requests
+ * is only sent once the local client made that request, as the host would.
+ */
+async function inputRewards(
+  game: GameManager,
+  options: CoopReplayOptions,
+  log: CoopReplayLog,
+  partner: CoopTestPartner,
+): Promise<void> {
+  const { role, remote } = options;
+  const by: CoopRole = role === "host" ? "guest" : "host";
+  const wave = game.scene.currentBattle.waveIndex;
+  const picker = coopSession!.pickerForWave(wave);
+  const scripts = options.rewards?.(wave) ?? {};
+  const actionsOf = (r: CoopRole): CoopRewardAction[] => scripts[r] ?? (r === picker ? [{ kind: "skip" }] : []);
+  const first = getCoopRewardGen() + 1;
+  const send = (message: CoopMessage) => {
+    log.inputs.push({ by, wave, turn: REWARD_TURN, message });
+    partner.send(message);
+  };
+
+  if ("log" in remote) {
+    const recorded = remote.log.inputs.filter(i => i.by === by && i.message.t === "reward" && i.message.wave === wave);
+    for (const { message } of recorded) {
+      if (message.t !== "reward" || message.by === by) {
+        send(message);
+        continue;
+      }
+      const off = partner.onReceive(sent => {
+        if (sent.t === "reward" && sent.req === message.req) {
+          off();
+          send(message);
+        }
+      });
+    }
+  } else {
+    // Only the guest's requests are made up: the host under test numbers them.
+    const actions = actionsOf(by);
+    const gens = screensFor(actions, first);
+    actions.forEach((action, i) => {
+      send({ t: "reward", wave, gen: gens[i], req: remoteRequests.count++, by, action });
+    });
+  }
+
+  const local = actionsOf(role);
+  const gens = screensFor(local, first);
+  for (const [i, action] of local.entries()) {
+    const phase = await toRewardScreen(game, gens[i]);
+    submitCoopRewardAction(phase, action);
+  }
+  await game.phaseInterceptor.to("TurnInitPhase");
+  await game.phaseInterceptor.to("CommandPhase");
+}
+
+/** Where a message the local client sent is filed in the log, `null` for messages that are not inputs. */
+function fileAt(game: GameManager, message: CoopMessage): { wave: number; turn: number } | null {
+  switch (message.t) {
+    case "reward":
+      return { wave: message.wave, turn: REWARD_TURN };
+    case "turnCommand":
+      return { wave: message.wave, turn: message.turn };
+    case "confirm":
+    case "choice": {
+      const { waveIndex, turn } = game.scene.currentBattle;
+      return "turn" in message && message.turn !== undefined
+        ? { wave: message.wave, turn: message.turn }
+        : { wave: waveIndex, turn };
+    }
+    default:
+      return null;
+  }
+}
+
+/** The partner's request count in a recording run. */
+const remoteRequests = { count: 0 };
+
 /** The inputs one player made, in order. */
 export function inputsBy(log: CoopReplayLog, role: CoopRole): CoopReplayInput[] {
   return log.inputs.filter(i => i.by === role);
@@ -442,13 +552,13 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
   };
   const log: CoopReplayLog = { inputs: [], checksums: [], enemyIds: [], states: [] };
   const partner = new CoopTestPartner(options.role);
+  remoteRequests.count = 0;
   let read = 0;
   /** File what the local client sent since the last call. */
   const collectSent = () => {
     for (const message of partner.received.slice(read)) {
-      if (message.t === "turnCommand" || message.t === "confirm" || message.t === "choice") {
-        const { waveIndex, turn } = game.scene.currentBattle;
-        const at = "turn" in message ? { wave: message.wave, turn: message.turn } : { wave: waveIndex, turn };
+      const at = fileAt(game, message);
+      if (at) {
         log.inputs.push({ by: options.role, ...at, message });
       }
     }
@@ -492,7 +602,9 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
           await game.phaseInterceptor.to("TurnInitPhase");
           await game.phaseInterceptor.to("CommandPhase");
         } else {
-          await game.toNextWave();
+          await inputRewards(game, options, log, partner);
+          await new Promise(resolve => setTimeout(resolve, 0));
+          collectSent();
         }
         waveStart();
       }

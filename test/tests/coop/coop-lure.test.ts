@@ -10,7 +10,7 @@ import { createTestStarterPayload, startCoopBattle } from "#test/utils/coop-repl
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-const LURES = ["LURE", "SUPER_LURE", "MAX_LURE"];
+const LURES: string[] = ["LURE", "SUPER_LURE", "MAX_LURE"];
 
 const snapshot = (trainerId: number): CoopAccountSnapshot => ({
   trainerId,
@@ -70,7 +70,7 @@ describe("co-op lures", () => {
     await game.classicMode.startBattle(SpeciesId.BULBASAUR);
 
     const weights = lureWeights(game);
-    expect(Object.keys(weights).sort()).toEqual([...LURES].sort());
+    expect(new Set(Object.keys(weights))).toEqual(new Set(LURES));
     expect(Object.values(weights).every(w => w > 0)).toBe(true);
   });
 });

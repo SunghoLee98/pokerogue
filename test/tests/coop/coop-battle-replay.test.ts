@@ -256,6 +256,10 @@ describe("co-op battle replay", () => {
     expectInSync(logs);
     expect(new Set(logs.hostLog.checksums.map(c => c.wave)).size).toBe(2);
     expect(inputsBy(logs.hostLog, "host").length).toBeGreaterThan(0);
-    expect(inputsBy(logs.hostLog, "guest").length).toBe(inputsBy(logs.hostLog, "host").length);
+    const commands = (role: "host" | "guest") =>
+      inputsBy(logs.hostLog, role).filter(i => i.message.t === "turnCommand");
+    expect(commands("guest").length).toBe(commands("host").length);
+    // The host picked (skipped) the first wave's reward.
+    expect(inputsBy(logs.hostLog, "host").filter(i => i.message.t === "reward")).toHaveLength(1);
   });
 });
