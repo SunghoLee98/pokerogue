@@ -54,6 +54,10 @@ path = [
     "package-lock.json",
     "pnpm-lock.yaml",
     "pnpm-workspace.yaml",
+    "coop-server/package.json",
+    "coop-server/pnpm-lock.yaml",
+    "coop-server/pnpm-workspace.yaml",
+    "coop-server/tsconfig.json",
     # Miscellaneous files of insignificant originality
     ".nvmrc",
     "RELEASE",
