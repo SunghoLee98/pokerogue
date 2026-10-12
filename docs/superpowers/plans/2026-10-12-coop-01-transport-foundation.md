@@ -280,7 +280,7 @@ describe("coop-protocol", () => {
 - [x] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-session.test.ts` / Expected: FAIL
 - [x] **Step 3: 구현**
 - [x] **Step 4: 전체 확인** — Run: `pnpm test test/tests/coop && pnpm typecheck && pnpm biome:ci && pnpm exec ls-lint && pnpm coop:server:test` / Expected: 모두 통과
-- [ ] **Step 5: 기존 테스트 회귀 확인** — Run: `pnpm test:silent` / Expected: 이 계획 전과 같은 결과(코어 변경이 없으므로 새 실패 없음)
+- [x] **Step 5: 기존 테스트 회귀 확인** — Run: `pnpm test:silent` / Expected: 이 계획 전과 같은 결과(코어 변경이 없으므로 새 실패 없음)
 - [x] **Step 6: 커밋** — `git commit -m "feat(coop): add session and ownership skeleton"`
 
 ---
@@ -297,3 +297,4 @@ describe("coop-protocol", () => {
 6. **`coop-server` 설치**: 루트 `pnpm-workspace.yaml` 때문에 `pnpm --dir coop-server install`이 루트를 설치하는 문제가 있어, `coop-server/pnpm-workspace.yaml`(`minimumReleaseAge` 포함)을 두어 독립 워크스페이스로 만들었다. 타입 검사용 `coop-server/tsconfig.json`과 루트 스크립트 `coop:server:typecheck`를 추가했다.
 7. **lint 예외**: 루트 biome가 `node:test` import를 막으므로 서버 테스트 두 파일에 사유를 단 `biome-ignore`를 붙였다(`biome.jsonc`는 그대로). `.ls-lint.yml` ignore에 `coop-server/node_modules`를 추가했다.
 8. **Node 버전**: 이 작업 환경은 Node 22.22였고, 22.18부터 타입 제거 실행이 기본이라 서버와 테스트가 그대로 동작했다. `engines`는 계획대로 `>=24`다.
+9. **회귀 확인**: 작업 환경에는 `assets` 서브모듈이 없어 전체 테스트가 타임아웃으로 돌지 못했다(작업 전 커밋에서도 같음). GitHub Actions `Tests` 워크플로우(run 38212930796, 커밋 214f183)에서 테스트 파일 458개 통과·8개 건너뜀, 테스트 3143개 통과·실패 0으로 확인했다.
