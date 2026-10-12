@@ -8,10 +8,28 @@ export const COOP_PROTOCOL_VERSION = 1;
 
 export type CoopRole = "host" | "guest";
 
+/**
+ * The parts of one player's account data that the battle simulation reads.
+ * Both clients must simulate with the same values, so each player's snapshot is shared with the peer.
+ * Only JSON-safe values, since it travels over the wire.
+ */
+export interface CoopAccountSnapshot {
+  trainerId: number;
+  secretId: number;
+  /** Species whose dex entry has a non-zero `caughtAttr` */
+  caughtSpecies: number[];
+  /** Root species → unlocked egg move bits, non-zero entries only */
+  eggMoves: Record<number, number>;
+  /** `Unlockables` for which `isUnlocked` returns `true` (overrides included) */
+  unlocks: number[];
+}
+
+/** The host's world-level account data sent in the `start` message. */
+export type CoopWorldData = CoopAccountSnapshot;
+
 // Payloads below are narrowed by later co-op plans.
 export type CoopStarterPayload = Record<string, unknown>;
 export type TurnCommandPayload = Record<string, unknown>;
-export type CoopWorldData = Record<string, unknown>;
 export type CoopSessionSnapshot = Record<string, unknown>;
 export type CoopChoiceKind = string;
 

@@ -12,7 +12,11 @@ describe("coop-protocol", () => {
     const messages: CoopMessage[] = [
       { t: "hello", gameVersion: "1.12.1.0", protocol: COOP_PROTOCOL_VERSION, accountName: "a" },
       { t: "starters", picks: [{ speciesId: 1 }], ready: true },
-      { t: "start", seed: "seed", hostWorldData: {} },
+      {
+        t: "start",
+        seed: "seed",
+        hostWorldData: { trainerId: 1, secretId: 2, caughtSpecies: [1], eggMoves: { 1: 3 }, unlocks: [0] },
+      },
       { t: "turnCommand", turn: 1, wave: 2, command: { move: 0 } },
       { t: "choice", kind: "reward", wave: 2, payload: 1 },
       { t: "ping", kind: "reward", payload: null },

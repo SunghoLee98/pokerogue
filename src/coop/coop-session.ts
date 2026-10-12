@@ -5,13 +5,14 @@
  */
 
 import { CoopOwnership } from "#coop/coop-ownership";
-import type { CoopRole } from "#coop/coop-protocol";
+import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
 import type { CoopTransport } from "#coop/coop-transport";
 
 export class CoopSession {
   readonly localRole: CoopRole;
   readonly transport: CoopTransport;
   readonly ownership: CoopOwnership;
+  private readonly accountSnapshots = new Map<CoopRole, CoopAccountSnapshot>();
 
   constructor(localRole: CoopRole, transport: CoopTransport, ownership = new CoopOwnership()) {
     this.localRole = localRole;
@@ -34,6 +35,22 @@ export class CoopSession {
 
   isLocallyOwned(pokemonId: number): boolean {
     return this.ownership.get(pokemonId) === this.localRole;
+  }
+
+  /** Store a player's account snapshot. The simulation reads these instead of the local `gameData`. */
+  setAccountSnapshot(role: CoopRole, snapshot: CoopAccountSnapshot): void {
+    this.accountSnapshots.set(role, snapshot);
+  }
+
+  /**
+   * @throws If the snapshot has not been received yet. Falling back to the local `gameData` would hide a desync.
+   */
+  getAccountSnapshot(role: CoopRole): CoopAccountSnapshot {
+    const snapshot = this.accountSnapshots.get(role);
+    if (!snapshot) {
+      throw new Error(`missing co-op account snapshot for ${role}`);
+    }
+    return snapshot;
   }
 }
 
