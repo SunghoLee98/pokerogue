@@ -234,7 +234,7 @@ describe("co-op battle replay", () => {
     const logs = await recordAndReplay({
       host: attack(() => game, MoveId.TACKLE, BattlerIndex.ENEMY),
       guest: attack(() => game, MoveId.SCRATCH, BattlerIndex.ENEMY),
-      setup: game => game.override.startingWave(200).startingBiome(BiomeId.END),
+      setup: g => g.override.startingWave(200).startingBiome(BiomeId.END),
       options: { waves: 1, turns: 2 },
     });
 

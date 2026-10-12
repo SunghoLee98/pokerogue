@@ -342,6 +342,7 @@ function synthesizeMessages(by: CoopRole, actions: CoopReplayAction[]): CoopMess
           ? command(synthesizeRunCommand(fieldIndex))
           : { t: "confirm", kind: "flee", wave, turn, accepted: false };
     }
+    throw new Error(`unknown replay action ${JSON.stringify(action)}`);
   });
 }
 

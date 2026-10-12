@@ -64,9 +64,9 @@ describe("co-op captures", () => {
     setCoopSession(null);
   });
 
-  async function start(role: CoopRole, start = startInfo()): Promise<CoopTestPartner> {
+  async function start(role: CoopRole, info = startInfo()): Promise<CoopTestPartner> {
     const partner = new CoopTestPartner(role);
-    await startCoopBattle(game, { role, start, transport: partner.localTransport });
+    await startCoopBattle(game, { role, start: info, transport: partner.localTransport });
     game.scene.pokeballCounts[PokeballType.MASTER_BALL] = 5;
     return partner;
   }
