@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { setCoopOwnerPartyMode } from "#coop/coop-pokemon-choice";
 import { PartyUiMode } from "#enums/party-ui-mode";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
@@ -20,7 +21,8 @@ export class RevivalBlessingPhase extends BattlePhase {
   }
 
   public override start(): void {
-    globalScene.ui.setMode(
+    setCoopOwnerPartyMode(
+      this.user,
       UiMode.PARTY,
       PartyUiMode.REVIVAL_BLESSING,
       this.user.getFieldIndex(),

@@ -6,6 +6,7 @@ import { Phase } from "#app/phase";
 import type { BackgroundMusic } from "#audio/background-music";
 import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import { FusionSpeciesFormEvolution } from "#balance/pokemon-evolutions";
+import { coopMayCancelEvolution, routeCoopEvolutionPause, settleCoopEvolutionCancel } from "#coop/coop-pokemon-choice";
 import { getTypeRgb } from "#data/type";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
 import { UiMode } from "#enums/ui-mode";
@@ -266,8 +267,9 @@ export class EvolutionPhase extends Phase {
   private prepareForCycle(evolvedPokemon: Pokemon): void {
     globalScene.time.delayedCall(1500, () => {
       this.pokemonEvoTintSprite.setScale(0.25).setVisible(true);
-      this.evolutionHandler.canCancel = this.canCancel;
-      globalScene.animations.doCycle(1, 15, this.pokemonTintSprite, this.pokemonEvoTintSprite).then(() => {
+      this.evolutionHandler.canCancel = this.canCancel && coopMayCancelEvolution(this.pokemon);
+      globalScene.animations.doCycle(1, 15, this.pokemonTintSprite, this.pokemonEvoTintSprite).then(async () => {
+        await settleCoopEvolutionCancel(this.pokemon, this.evolutionHandler);
         if (this.evolutionHandler.cancelled) {
           this.handleFailedEvolution(evolvedPokemon);
         } else {
@@ -330,7 +332,10 @@ export class EvolutionPhase extends Phase {
         globalScene.time.delayedCall(3000, endCallback);
       },
     };
-    globalScene.ui.setOverlayMode(UiMode.CONFIRM, options);
+    const coopOptions = routeCoopEvolutionPause(this.pokemon, options, endCallback, this.preEvolvedPokemonName);
+    if (coopOptions) {
+      globalScene.ui.setOverlayMode(UiMode.CONFIRM, coopOptions);
+    }
   }
 
   /**

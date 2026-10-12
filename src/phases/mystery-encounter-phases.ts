@@ -74,7 +74,7 @@ export class MysteryEncounterPhase extends Phase {
    * @param index
    */
   handleOptionSelect(option: MysteryEncounterOption, index: number): boolean {
-    if (routeCoopEncounterOption(index)) {
+    if (routeCoopEncounterOption(this, option, index)) {
       return true;
     }
     // Set option selected flag

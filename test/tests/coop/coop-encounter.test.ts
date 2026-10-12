@@ -325,4 +325,69 @@ describe("co-op mystery encounters", () => {
       expect(encounter.misc).toHaveProperty("correctMove");
     });
   });
+
+  describe("options that touch the partner's pokemon", () => {
+    /** Dark Deal's first option gives away a random pokemon, which may be the partner's. */
+    const WAVE = 13;
+
+    async function startDarkDeal(role: CoopRole): Promise<CoopTestPartner> {
+      game.override.startingWave(WAVE);
+      const partner = new CoopTestPartner(role);
+      await startCoopEncounter(game, {
+        role,
+        start: startInfo(),
+        transport: partner.localTransport,
+        encounter: MysteryEncounterType.DARK_DEAL,
+      });
+      return partner;
+    }
+
+    const encounter = () => game.scene.currentBattle.mysteryEncounter!;
+    const choices = (partner: CoopTestPartner) =>
+      partner.received.filter((m): m is Extract<CoopMessage, { t: "choice" }> => m.t === "choice");
+
+    it("asks the partner before taking the option", async () => {
+      const partner = await startDarkDeal("host");
+      (game.scene.ui.getHandler() as MysteryEncounterUiHandler).processInput(Button.ACTION);
+      await vi.waitUntil(() => choices(partner).length > 0);
+
+      expect(choices(partner)).toEqual([{ t: "choice", kind: "optionAsk", wave: WAVE, payload: { seq: 0, index: 0 } }]);
+      expect(encounter().selectedOption).toBeUndefined();
+      partner.send({ t: "confirm", kind: "meOption", wave: WAVE, seq: 0, accepted: true });
+      await vi.waitUntil(() => encounter().selectedOption !== undefined);
+
+      expect(encounter().selectedOption).toBe(encounter().options[0]);
+      expect(choices(partner).at(-1)?.payload).toEqual({ index: 0 });
+    });
+
+    it("stays on the options when the partner declines", async () => {
+      const partner = await startDarkDeal("host");
+      (game.scene.ui.getHandler() as MysteryEncounterUiHandler).processInput(Button.ACTION);
+      await vi.waitUntil(() => choices(partner).length > 0);
+      expect(getCoopBannerText()).toBe(coopText("waitingForOwner"));
+      partner.send({ t: "confirm", kind: "meOption", wave: WAVE, seq: 0, accepted: false });
+      await vi.waitUntil(() => getCoopBannerText() === coopText("ownerDeclined"));
+
+      expect(encounter().selectedOption).toBeUndefined();
+      expect(choices(partner).map(m => m.kind)).toEqual(["optionAsk"]);
+    });
+
+    it("lets the partner answer", async () => {
+      const partner = await startDarkDeal("guest");
+      partner.send({ t: "choice", kind: "optionAsk", wave: WAVE, payload: { seq: 3, index: 0 } });
+      await vi.waitUntil(() => game.scene.ui.mode === UiMode.CONFIRM);
+      const confirm = game.scene.ui.getHandler() as ConfirmUiHandler;
+      confirm.setCursor(0);
+      confirm.processInput(Button.ACTION);
+      await vi.waitUntil(() => partner.received.some(m => m.t === "confirm"));
+
+      expect(partner.received.find(m => m.t === "confirm")).toEqual({
+        t: "confirm",
+        kind: "meOption",
+        wave: WAVE,
+        seq: 3,
+        accepted: true,
+      });
+    });
+  });
 });

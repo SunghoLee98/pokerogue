@@ -58,6 +58,10 @@ const COOP_TEXT = {
     en: "Your partner wants to use {{pokemonName}}. Allow it?",
     ko: "파트너가 {{pokemonName}}을(를) 고르려 합니다. 허락할까요?",
   },
+  partnerOptionAsk: {
+    en: "Your partner wants option {{option}}, which may affect your Pokémon. Allow it?",
+    ko: "파트너가 {{option}}번 선택지를 고르려 합니다. 내 포켓몬에게 영향이 있을 수 있습니다. 허락할까요?",
+  },
   waitingForOwner: { en: "Waiting for your partner to allow it...", ko: "파트너의 허락을 기다리는 중..." },
   ownerDeclined: { en: "Your partner did not allow it.", ko: "파트너가 허락하지 않았습니다." },
   partnerPinged: { en: "Your partner suggests this one!", ko: "파트너: 이거 골라줘!" },
