@@ -31,10 +31,7 @@ const COOP_TEXT = {
   connectionFailed: { en: "Could not connect to your partner.", ko: "파트너와 연결하지 못했습니다." },
   partnerPicking: { en: "Partner: picking", ko: "파트너: 고르는 중" },
   partnerReady: { en: "Partner: ready", ko: "파트너: 준비 완료" },
-  waitingForReady: {
-    en: "Waiting for your partner...\nPress cancel to pick again.",
-    ko: "파트너를 기다리는 중...\n다시 고르려면 취소를 누르세요.",
-  },
+  waitingForReady: { en: "Ready! Cancel to pick again", ko: "준비 완료! 취소로 다시 고르기" },
   partnerLeft: { en: "Your partner left.", ko: "파트너가 나갔습니다." },
 } as const satisfies Record<string, { en: string; ko: string }>;
 

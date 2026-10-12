@@ -1,4 +1,4 @@
-import { PLAYER_PARTY_MAX_SIZE, VALUE_REDUCTION_MAX } from "#app/constants";
+import { VALUE_REDUCTION_MAX } from "#app/constants";
 import { eventBus } from "#app/event-bus";
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
@@ -13,6 +13,12 @@ import {
   getValueReductionCandyCounts,
   POKERUS_STARTER_COUNT,
 } from "#balance/starters";
+import { getStarterPickLimit } from "#coop/coop-starter-rules";
+import {
+  type CoopStarterSelectController,
+  type CoopStarterSelectLayout,
+  createCoopStarterSelectUi,
+} from "#coop/coop-starter-select-ui";
 import { allMoves } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { getNatureName } from "#data/nature";
@@ -207,6 +213,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   //variables to keep track of the dynamically rendered list of instruction prompts for starter select
 
   private starterSelectCallback: StarterSelectCallback | null;
+  private coopUi: CoopStarterSelectController | null = null;
 
   private starterPreferences: AllStarterPreferences;
   private originalStarterPreferences: AllStarterPreferences;
@@ -611,6 +618,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.filterBarCursor = 0;
       this.setCursor(0);
       this.tryUpdateValue(0);
+
+      const coopLayout: CoopStarterSelectLayout = {
+        iconPosition: i => [teamWindowX + 7, calcStarterIconY(i)],
+        statusPosition: [teamWindowX - 4, 162],
+      };
+      this.coopUi = createCoopStarterSelectUi(this.starterSelectContainer, coopLayout, starters => {
+        this.getUi().setMode(UiMode.STARTER_SELECT);
+        const callback = this.starterSelectCallback;
+        this.starterSelectCallback = null;
+        callback?.(starters);
+      });
 
       handleTutorial(Tutorial.STARTER_SELECT);
 
@@ -1067,7 +1085,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         // This prevents repeated rapid button presses from adding duplicate starters to the party
         this.blockInput = true;
 
-        if (this.partyStarterIds.length >= 6) {
+        if (this.partyStarterIds.length >= getStarterPickLimit()) {
           this.blockInput = false;
           error = true;
           break;
@@ -1597,7 +1615,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       !isDupe
       && isValidForChallenge
       && currentPartyValue + newCost <= getRunValueLimit()
-      && this.partyStarterIds.length < PLAYER_PARTY_MAX_SIZE
+      && this.partyStarterIds.length < getStarterPickLimit()
     ) {
       options.push({
         label: i18next.t("starterSelectUiHandler:addToParty"),
@@ -2092,6 +2110,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   public override processInput(button: Button): boolean {
     if (this.blockInput) {
       return false;
+    }
+    if (this.coopUi?.processInput(button)) {
+      return true;
     }
 
     const ui = this.getUi();
@@ -3142,6 +3163,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         globalScene.money = globalScene.gameMode.getStartingMoney();
         const starters = this.partyStarters.slice(0);
         ui.setMode(UiMode.STARTER_SELECT);
+        if (this.coopUi?.confirm(starters)) {
+          return;
+        }
         const originalStarterSelectCallback = this.starterSelectCallback;
         this.starterSelectCallback = null;
         originalStarterSelectCallback?.(starters);
@@ -3270,6 +3294,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     this.starterSelectContainer.setVisible(false);
     this.blockInput = false;
+    this.coopUi?.destroy();
+    this.coopUi = null;
 
     while (this.partyStarterIds.length > 0) {
       this.popPartyStarter(this.partyStarterIds.length - 1);
