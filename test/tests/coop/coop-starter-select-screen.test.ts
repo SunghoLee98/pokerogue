@@ -5,11 +5,14 @@ import { Nature } from "#enums/nature";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
+import { createTestStarterPayload } from "#test/utils/coop-replay";
 import type { Starter } from "#types/save-data";
 import type { ConfirmModeConfig } from "#types/ui-types";
 import type { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
 import Phaser from "phaser";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+const flush = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 const emptySnapshot = { trainerId: 0, secretId: 0, caughtSpecies: [], eggMoves: {}, unlocks: [] };
 
@@ -93,5 +96,38 @@ describe("co-op on the starter select screen", () => {
     handler.processInput(Button.CANCEL);
     expect(lobby.selection.localReady).toBe(false);
     expect(messageBoxVisible()).toBe(false);
+  });
+
+  it("hides the empty slot placeholder behind the partner's picks", async () => {
+    const { pair } = await setUp();
+    const placeholders = handler["partyIcons"].slice(3);
+    // Headless sprites do not keep their visibility, so this follows the last `setVisible` call (visible by default)
+    const setVisible = placeholders.map(icon => vi.spyOn(icon, "setVisible"));
+    const visible = () => setVisible.map(spy => spy.mock.lastCall?.[0] ?? true);
+    expect(visible()).toEqual([true, true, true]);
+
+    pair.host.send({
+      t: "starters",
+      picks: [createTestStarterPayload(SpeciesId.PIKACHU)],
+      ready: true,
+      account: emptySnapshot,
+    });
+    await flush();
+    expect(visible()).toEqual([false, true, true]);
+
+    pair.host.send({ t: "starters", picks: [], ready: false, account: emptySnapshot });
+    await flush();
+    expect(visible()).toEqual([true, true, true]);
+
+    pair.host.send({
+      t: "starters",
+      picks: [createTestStarterPayload(SpeciesId.PIKACHU)],
+      ready: true,
+      account: emptySnapshot,
+    });
+    await flush();
+    handler["coopUi"]?.destroy();
+    handler["coopUi"] = null;
+    expect(visible()).toEqual([true, true, true]);
   });
 });

@@ -111,16 +111,21 @@ export class CoopStarterSelectController {
 export interface CoopStarterSelectLayout {
   /** Position of team slot `index` (0-5); the partner's picks use the slots after the player's own */
   iconPosition(index: number): [x: number, y: number];
+  /** The screen's own team slot icons (0-5); the free ones show the empty-slot placeholder */
+  slotIcons: readonly Phaser.GameObjects.Sprite[];
   statusPosition: [x: number, y: number];
 }
 
 /** Draws the partner's picks as icons in the free team slots and the status as text. */
 class PhaserCoopPartnerView implements CoopPartnerView {
   private readonly icons: Phaser.GameObjects.Sprite[];
+  /** The placeholders under {@linkcode icons}, hidden while a partner pick covers them */
+  private readonly placeholders: Phaser.GameObjects.Sprite[];
   private readonly status: Phaser.GameObjects.Text;
 
   constructor(container: Phaser.GameObjects.Container, layout: CoopStarterSelectLayout, firstSlot: number) {
     this.icons = [];
+    this.placeholders = layout.slotIcons.slice(firstSlot, firstSlot + 3);
     for (let i = 0; i < 3; i++) {
       const [x, y] = layout.iconPosition(firstSlot + i);
       this.icons.push(globalScene.add.sprite(x, y, "pokemon_icons_0").setScale(0.5).setOrigin(0).setVisible(false));
@@ -133,6 +138,7 @@ class PhaserCoopPartnerView implements CoopPartnerView {
   setPartner(picks: readonly CoopStarterPayload[]): void {
     for (const [i, icon] of this.icons.entries()) {
       const pick = picks.at(i);
+      this.placeholders.at(i)?.setVisible(!pick);
       if (!pick) {
         icon.setVisible(false);
         continue;
@@ -153,6 +159,9 @@ class PhaserCoopPartnerView implements CoopPartnerView {
   destroy(): void {
     for (const icon of this.icons) {
       icon.destroy();
+    }
+    for (const placeholder of this.placeholders) {
+      placeholder.setVisible(true);
     }
     this.status.destroy();
   }

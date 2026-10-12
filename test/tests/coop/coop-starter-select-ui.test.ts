@@ -170,6 +170,7 @@ describe("co-op starter select phase", () => {
     const add = vi.spyOn(container, "add");
     const layout = {
       iconPosition: (i: number): [number, number] => [0, i * 10],
+      slotIcons: [],
       statusPosition: [0, 0] as [number, number],
     };
     expect(createCoopStarterSelectUi(container, layout, () => {})).toBeNull();

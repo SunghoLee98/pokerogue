@@ -633,6 +633,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private setUpCoop(): void {
     const coopLayout: CoopStarterSelectLayout = {
       iconPosition: i => [teamWindowX + 7, calcStarterIconY(i)],
+      slotIcons: this.partyIcons,
       statusPosition: [teamWindowX - 4, 162],
     };
     this.coopUi = createCoopStarterSelectUi(this.starterSelectContainer, coopLayout, starters => {
