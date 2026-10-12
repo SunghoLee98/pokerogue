@@ -4,6 +4,7 @@ import { wrapCoopPartyFilter } from "#coop/coop-field";
 import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
 import { coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
+import { coopText } from "#coop/coop-text";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
@@ -112,6 +113,21 @@ describe("co-op captures", () => {
     expect(party[3].species.speciesId).toBe(caught.species.speciesId);
     expect(ownerOf(party[3].id)).toBe("guest");
     expect(coopSession?.ownership.countOwnedBy("guest", partyIds())).toBe(3);
+  });
+
+  it("clears the waiting text once the thrower's choice is applied", async () => {
+    const partner = await start("host");
+    const released = game.scene.getPlayerParty()[3];
+    const showText = vi.spyOn(game.scene.ui, "showText");
+    game.move.select(MoveId.SPLASH, BattlerIndex.PLAYER);
+    partner.sendCommand(synthesizeBallCommand(1, PokeballType.MASTER_BALL, BattlerIndex.ENEMY));
+    partner.sendDecision({ kind: "capture", seq: 0, action: "replace", releasedId: released.id, insertIndex: 3 });
+    await game.toEndOfTurn();
+
+    const texts = showText.mock.calls.map(call => call[0]);
+    const waiting = texts.indexOf(coopText("waitingForPartnerChoice"));
+    expect(waiting).toBeGreaterThan(-1);
+    expect(texts[waiting + 1]).toBe("");
   });
 
   it("applies the thrower's choice to let the catch go", async () => {

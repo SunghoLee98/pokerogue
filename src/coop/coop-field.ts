@@ -168,6 +168,8 @@ export function routeCoopSwitch(fieldIndex: number, select: CoopSwitchSelect): C
     if (decision.kind !== "switch") {
       throw new Error(`expected the partner's switch choice ${seq}, got ${decision.kind}`);
     }
+    // `clearText` would be refilled by the text still being typed.
+    globalScene.ui.showText("", 0);
     select(decision.slotIndex, decision.option);
   });
   return null;

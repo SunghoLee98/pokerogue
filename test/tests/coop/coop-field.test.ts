@@ -1,6 +1,7 @@
 import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
 import { coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
+import { coopText } from "#coop/coop-text";
 import { BattleStyle } from "#enums/battle-style";
 import { BattlerIndex } from "#enums/battler-index";
 import { MoveId } from "#enums/move-id";
@@ -100,6 +101,19 @@ describe("co-op field slots", () => {
 
     expect(game.scene.getPlayerField()[1]).toBe(rattata);
     expect(rattata.isOnField()).toBe(true);
+  });
+
+  it("clears the waiting text once the owner's choice is applied", async () => {
+    const partner = await start("host", [SpeciesId.BULBASAUR], [SpeciesId.CHARMANDER, SpeciesId.RATTATA]);
+    const showText = vi.spyOn(game.scene.ui, "showText");
+    await guestFaintsAsHost(partner);
+    partner.sendDecision({ kind: "switch", seq: 0, slotIndex: 2, option: PartyOption.SEND_OUT });
+    await game.toNextTurn();
+
+    const texts = showText.mock.calls.map(call => call[0]);
+    const waiting = texts.indexOf(coopText("waitingForPartnerChoice"));
+    expect(waiting).toBeGreaterThan(-1);
+    expect(texts[waiting + 1]).toBe("");
   });
 
   it("lets the owner choose the replacement and sends it", async () => {

@@ -111,6 +111,8 @@ export class CoopCaptureDecision {
       if (decision.kind !== "capture") {
         throw new Error(`expected the partner's capture choice ${this.seq}, got ${decision.kind}`);
       }
+      // `clearText` would be refilled by the text still being typed.
+      globalScene.ui.showText("", 0);
       if (decision.action === "replace") {
         releasePartyMember(decision.releasedId);
         handlers.replace(decision.insertIndex);

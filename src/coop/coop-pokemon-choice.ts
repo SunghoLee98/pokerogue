@@ -76,6 +76,7 @@ export function awaitCoopLearnMove(phase: LearnMovePhase, pokemon: Pokemon, move
       return;
     }
     const ui = globalScene.ui;
+    ui.showText("", 0);
     const pokemonName = getPokemonNameWithAffix(pokemon);
     if (decision.moveIndex < 0) {
       ui.showTextPromise(i18next.t("battle:learnMoveNotLearned", { pokemonName, moveName: move.name }), undefined, true) //
