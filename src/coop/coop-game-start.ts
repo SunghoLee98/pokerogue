@@ -57,7 +57,8 @@ export function assembleCoopParty(start: CoopStartInfo, level: number): PlayerPo
 }
 
 /**
- * Start the agreed co-op run: open the session, switch to the co-op save slot, create the party and load it,
+ * Start the agreed co-op run: open the session, switch to the co-op save slot, set the starting money,
+ * create the party and load it,
  * then hand over to the rest of the solo start (`SelectStarterPhase.initBattle` with no further starters).
  * @param initBattle - Continues the solo start with the party already in place
  */
@@ -69,6 +70,8 @@ export async function startCoopRun(
 ): Promise<void> {
   beginCoopSession(role, transport, start);
   globalScene.sessionSlotId = COOP_SESSION_SLOT;
+  // Money is part of the shared state; set it here rather than rely on what each client's screen did.
+  globalScene.money = globalScene.gameMode.getStartingMoney();
   const party = assembleCoopParty(start, globalScene.gameMode.getStartingLevel());
   globalScene.getPlayerParty().push(...party);
   await Promise.all(party.map(pokemon => pokemon.loadAssets()));

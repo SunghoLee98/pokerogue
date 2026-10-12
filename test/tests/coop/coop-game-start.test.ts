@@ -114,6 +114,12 @@ describe("co-op game start", () => {
     expect(COOP_SESSION_SLOT).toBe(5);
   });
 
+  it("starts with the starting money, whatever the screen set before", async () => {
+    game.scene.money = 12345;
+    await startCoopBattle(game, { role: "host", start: startInfo([SpeciesId.BULBASAUR], [SpeciesId.CHARMANDER]) });
+    expect(game.scene.money).toBe(game.scene.gameMode.getStartingMoney());
+  });
+
   describe("timed events", () => {
     const pastEvent = {
       name: "Coop Test Event",
