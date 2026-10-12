@@ -11,7 +11,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
-import { CoopTestPartner, synthesizeMoveCommand } from "#test/utils/coop-partner";
+import { CoopTestPartner, synthesizeMoveCommand, waitForCoop } from "#test/utils/coop-partner";
 import { createTestStarterPayload, startCoopBattle } from "#test/utils/coop-replay";
 import type { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import type { PartyUiHandler } from "#ui/party-ui-handler";
@@ -89,13 +89,13 @@ describe("co-op choices for one's own pokemon", () => {
       game.scene.phaseManager.unshiftNew("LearnMovePhase", 1, MoveId.EMBER);
       splashTurn("guest", partner);
       const turn = game.toEndOfTurn();
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.CONFIRM, { timeout: 10_000 });
+      await waitForCoop(() => game.scene.ui.mode === UiMode.CONFIRM);
       game.scene.ui.getHandler().processInput(Button.ACTION);
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.SUMMARY, { timeout: 10_000 });
+      await waitForCoop(() => game.scene.ui.mode === UiMode.SUMMARY);
       game.scene.ui.getHandler().setCursor(2);
       game.scene.ui.getHandler().processInput(Button.ACTION);
       await turn;
-      await vi.waitUntil(() => decisions(partner).length > 0);
+      await waitForCoop(() => decisions(partner).length > 0);
 
       expect(
         charmander()
@@ -111,7 +111,7 @@ describe("co-op choices for one's own pokemon", () => {
       splashTurn("host", partner);
       await game.phaseInterceptor.to("LearnMovePhase", false);
       const learning = game.phaseInterceptor.to("LearnMovePhase");
-      await vi.waitUntil(() => game.textInterceptor.logs.includes(coopText("waitingForPartnerChoice")));
+      await waitForCoop(() => game.textInterceptor.logs.includes(coopText("waitingForPartnerChoice")));
 
       expect(game.scene.ui.mode).not.toBe(UiMode.CONFIRM);
       partner.sendDecision({ kind: "learnMove", seq: 0, moveIndex: 1 });
@@ -152,9 +152,9 @@ describe("co-op choices for one's own pokemon", () => {
       splashTurn("host", partner);
       await game.phaseInterceptor.to("EvolutionPhase", false);
       const evolving = game.phaseInterceptor.to("EndEvolutionPhase");
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.EVOLUTION_SCENE);
+      await waitForCoop(() => game.scene.ui.mode === UiMode.EVOLUTION_SCENE);
       const handler = game.scene.ui.getHandler() as EvolutionSceneUiHandler;
-      await vi.waitUntil(() => handler.canCancel || game.textInterceptor.logs.length > 0);
+      await waitForCoop(() => handler.canCancel || game.textInterceptor.logs.length > 0);
       expect(handler.canCancel).toBe(false);
       await evolving;
 
@@ -175,16 +175,13 @@ describe("co-op choices for one's own pokemon", () => {
       });
       const evolving = game.phaseInterceptor.to("EndEvolutionPhase");
       // "Stopped evolving", then "pause evolutions?": yes.
-      await vi.waitUntil(
-        () => {
-          const scene = game.scene.ui.handlers[UiMode.EVOLUTION_SCENE] as unknown as { awaitingActionInput: boolean };
-          if (scene.awaitingActionInput) {
-            game.scene.ui.handlers[UiMode.EVOLUTION_SCENE].processInput(Button.ACTION);
-          }
-          return game.scene.ui.mode === UiMode.CONFIRM;
-        },
-        { timeout: 10_000 },
-      );
+      await waitForCoop(() => {
+        const scene = game.scene.ui.handlers[UiMode.EVOLUTION_SCENE] as unknown as { awaitingActionInput: boolean };
+        if (scene.awaitingActionInput) {
+          game.scene.ui.handlers[UiMode.EVOLUTION_SCENE].processInput(Button.ACTION);
+        }
+        return game.scene.ui.mode === UiMode.CONFIRM;
+      });
       game.scene.ui.getHandler().processInput(Button.ACTION);
       await evolving;
 
@@ -215,7 +212,7 @@ describe("co-op choices for one's own pokemon", () => {
       game.scene.phaseManager.unshiftNew("RevivalBlessingPhase", charmander());
       splashTurn("guest", partner);
       const turn = game.toEndOfTurn();
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.PARTY, { timeout: 10_000 });
+      await waitForCoop(() => game.scene.ui.mode === UiMode.PARTY);
       const party = game.scene.ui.getHandler() as PartyUiHandler;
       party.setCursor(2);
       party.processInput(Button.ACTION);
@@ -235,7 +232,7 @@ describe("co-op choices for one's own pokemon", () => {
       splashTurn("host", partner);
       await game.phaseInterceptor.to("RevivalBlessingPhase", false);
       const reviving = game.phaseInterceptor.to("RevivalBlessingPhase");
-      await vi.waitUntil(() => getCoopBannerText() !== null || game.scene.ui.mode === UiMode.PARTY);
+      await waitForCoop(() => getCoopBannerText() !== null || game.scene.ui.mode === UiMode.PARTY);
 
       expect(game.scene.ui.mode).not.toBe(UiMode.PARTY);
       partner.sendDecision({ kind: "partyPick", seq: 0, slotIndex: 2, option: 0 });

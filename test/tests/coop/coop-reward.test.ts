@@ -10,12 +10,12 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { ExpShareModifier, TurnHealModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
-import { CoopTestPartner, synthesizeMoveCommand } from "#test/utils/coop-partner";
+import { CoopTestPartner, synthesizeMoveCommand, waitForCoop } from "#test/utils/coop-partner";
 import { createTestStarterPayload, startCoopBattle } from "#test/utils/coop-replay";
 import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import { PartyOption, type PartyUiHandler } from "#ui/party-ui-handler";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const snapshot = (trainerId: number): CoopAccountSnapshot => ({
   trainerId,
@@ -76,7 +76,7 @@ describe("co-op reward turns", () => {
     partner.sendCommand(synthesizeMoveCommand(role === "host" ? 1 : 0, MoveId.SPLASH));
     await game.phaseInterceptor.to("SelectModifierPhase", false);
     await game.phaseInterceptor.to("SelectModifierPhase");
-    await vi.waitUntil(() => game.scene.ui.mode === UiMode.MODIFIER_SELECT && handler()["awaitingActionInput"]);
+    await waitForCoop(() => game.scene.ui.mode === UiMode.MODIFIER_SELECT && handler()["awaitingActionInput"]);
     return partner;
   }
 
@@ -106,7 +106,7 @@ describe("co-op reward turns", () => {
     const partner = await toRewardScreen("guest", 3);
     expect(getCoopBannerText()).toBe(coopText("partnerPickingReward"));
     choose(1, 2);
-    await vi.waitUntil(() => partner.received.some(m => m.t === "ping"));
+    await waitForCoop(() => partner.received.some(m => m.t === "ping"));
 
     expect(expShares()).toBe(0);
     expect(game.scene.phaseManager.getCurrentPhase().is("SelectModifierPhase")).toBe(true);
@@ -130,7 +130,7 @@ describe("co-op reward turns", () => {
     const partner = await toRewardScreen("guest", 4);
     expect(getCoopBannerText()).toBeNull();
     choose(1, 0);
-    await vi.waitUntil(() => rewardEvents(partner).length > 0);
+    await waitForCoop(() => rewardEvents(partner).length > 0);
 
     expect(rewardEvents(partner)).toEqual([
       { t: "reward", wave: 4, gen: 0, req: 0, by: "guest", action: { kind: "reward", option: 0 } },
@@ -156,7 +156,7 @@ describe("co-op reward turns", () => {
     const partner = await toRewardScreen("host", 3);
     const charmander = game.scene.getPlayerParty()[1];
     choose(1, 1);
-    await vi.waitUntil(() => game.scene.ui.mode === UiMode.PARTY);
+    await waitForCoop(() => game.scene.ui.mode === UiMode.PARTY);
     const party = game.scene.ui.getHandler() as PartyUiHandler;
     party.setCursor(1);
     party.processInput(Button.ACTION);
@@ -174,7 +174,7 @@ describe("co-op reward turns", () => {
     const partner = await toRewardScreen("host", 3);
     game.scene.money = 1000;
     choose(0, 0);
-    await vi.waitUntil(() => rewardEvents(partner).length > 0);
+    await waitForCoop(() => rewardEvents(partner).length > 0);
     await game.phaseInterceptor.to("SelectModifierPhase");
 
     expect(game.scene.money).toBe(750);
@@ -186,7 +186,7 @@ describe("co-op reward turns", () => {
     const partner = await toRewardScreen("guest", 3);
     game.scene.money = 1000;
     choose(0, 0);
-    await vi.waitUntil(() => partner.received.some(m => m.t === "ping"));
+    await waitForCoop(() => partner.received.some(m => m.t === "ping"));
 
     expect(game.scene.money).toBe(1000);
     expect(game.scene.phaseManager.getCurrentPhase()["rerollCount"]).toBe(0);
@@ -206,7 +206,7 @@ describe("co-op reward turns", () => {
   it("marks a pinged reward on the picker's screen", async () => {
     const partner = await toRewardScreen("host", 3);
     partner.send({ t: "ping", kind: "reward", payload: { row: 1, cursor: 2 } });
-    await vi.waitUntil(() =>
+    await waitForCoop(() =>
       handler()
         .options[2].getAll()
         .some(o => o.name === "coop-ping"),

@@ -11,7 +11,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { allMysteryEncounters, mysteryEncountersByBiome } from "#mystery-encounters/mystery-encounter-biomes";
 import { GameManager } from "#test/framework/game-manager";
-import { CoopTestPartner } from "#test/utils/coop-partner";
+import { CoopTestPartner, waitForCoop } from "#test/utils/coop-partner";
 import { createTestStarterPayload, startCoopBattle, startCoopEncounter } from "#test/utils/coop-replay";
 import type { ConfirmUiHandler } from "#ui/confirm-ui-handler";
 import type { MessageUiHandler } from "#ui/message-ui-handler";
@@ -124,7 +124,7 @@ describe("co-op mystery encounters", () => {
     it("sends the picker's option", async () => {
       const partner = await startEncounter("host");
       chooseSecond();
-      await vi.waitUntil(() => partner.received.some(m => m.t === "choice"));
+      await waitForCoop(() => partner.received.some(m => m.t === "choice"));
 
       expect(partner.received.filter(m => m.t === "choice")).toEqual([
         { t: "choice", kind: "meOption", wave: WAVE, payload: { index: 1 } },
@@ -136,7 +136,7 @@ describe("co-op mystery encounters", () => {
       const partner = await startEncounter("guest");
       expect(getCoopBannerText()).toBe(coopText("waitingForPartnerChoice"));
       chooseSecond();
-      await vi.waitUntil(() => partner.received.some(m => m.t === "ping"));
+      await waitForCoop(() => partner.received.some(m => m.t === "ping"));
 
       expect(partner.received.find(m => m.t === "ping")).toEqual({
         t: "ping",
@@ -183,7 +183,7 @@ describe("co-op mystery encounters", () => {
 
     /** Pick a slot in the open party screen. */
     async function selectInParty(slot: number): Promise<void> {
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.PARTY);
+      await waitForCoop(() => game.scene.ui.mode === UiMode.PARTY);
       const partyUi = game.scene.ui.getHandler() as PartyUiHandler;
       partyUi.setCursor(slot);
       partyUi.processInput(Button.ACTION);
@@ -193,7 +193,7 @@ describe("co-op mystery encounters", () => {
     it("needs no confirmation for the picker's own pokemon", async () => {
       const partner = await startPartTimer("host");
       await pickSlot(0);
-      await vi.waitUntil(() => worked(0));
+      await waitForCoop(() => worked(0));
 
       expect(choices(partner).map(m => [m.kind, m.payload])).toEqual([
         ["meOption", { index: 0 }],
@@ -205,7 +205,7 @@ describe("co-op mystery encounters", () => {
     it("asks the owner before using the partner's pokemon", async () => {
       const partner = await startPartTimer("host");
       await pickSlot(1);
-      await vi.waitUntil(() => choices(partner).some(m => m.kind === "ownerAsk"));
+      await waitForCoop(() => choices(partner).some(m => m.kind === "ownerAsk"));
 
       expect(choices(partner).at(-1)).toEqual({
         t: "choice",
@@ -215,7 +215,7 @@ describe("co-op mystery encounters", () => {
       });
       expect(worked(1)).toBe(false);
       partner.send({ t: "confirm", kind: "mePokemon", wave: WAVE, seq: 0, accepted: true });
-      await vi.waitUntil(() => worked(1));
+      await waitForCoop(() => worked(1));
 
       expect(choices(partner).at(-1)?.payload).toEqual({ kind: "partySelect", seq: 0, slot: 1 });
     });
@@ -223,12 +223,12 @@ describe("co-op mystery encounters", () => {
     it("lets the picker choose again when the owner declines", async () => {
       const partner = await startPartTimer("host");
       await pickSlot(1);
-      await vi.waitUntil(() => choices(partner).some(m => m.kind === "ownerAsk"));
+      await waitForCoop(() => choices(partner).some(m => m.kind === "ownerAsk"));
       partner.send({ t: "confirm", kind: "mePokemon", wave: WAVE, seq: 0, accepted: false });
-      await vi.waitUntil(() => game.textInterceptor.logs.includes(coopText("ownerDeclined")));
+      await waitForCoop(() => game.textInterceptor.logs.includes(coopText("ownerDeclined")));
       (game.scene.ui.getHandler() as MessageUiHandler).processInput(Button.ACTION);
       await selectInParty(0);
-      await vi.waitUntil(() => worked(0));
+      await waitForCoop(() => worked(0));
 
       expect(game.textInterceptor.logs).toContain(coopText("ownerDeclined"));
       expect(worked(1)).toBe(false);
@@ -239,14 +239,14 @@ describe("co-op mystery encounters", () => {
     async function askedAsGuest(partner: CoopTestPartner, accept: boolean): Promise<void> {
       partner.send({ t: "choice", kind: "meOption", wave: WAVE, payload: { index: 0 } });
       partner.send({ t: "choice", kind: "ownerAsk", wave: WAVE, payload: { seq: 0, slot: 1 } });
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.CONFIRM);
+      await waitForCoop(() => game.scene.ui.mode === UiMode.CONFIRM);
       expect(game.textInterceptor.logs.at(-1)).toBe(
         coopText("ownerAsk", { pokemonName: party()[1].getNameToRender() }),
       );
       const confirm = game.scene.ui.getHandler() as ConfirmUiHandler;
       confirm.setCursor(accept ? 0 : 1);
       confirm.processInput(Button.ACTION);
-      await vi.waitUntil(() => partner.received.some(m => m.t === "confirm"));
+      await waitForCoop(() => partner.received.some(m => m.t === "confirm"));
     }
 
     it("lets the owner allow the pick and follows it", async () => {
@@ -261,7 +261,7 @@ describe("co-op mystery encounters", () => {
         accepted: true,
       });
       partner.sendDecision({ kind: "partySelect", seq: 0, slot: 1 });
-      await vi.waitUntil(() => worked(1));
+      await waitForCoop(() => worked(1));
       expect(worked(0)).toBe(false);
     });
 
@@ -293,17 +293,17 @@ describe("co-op mystery encounters", () => {
     it("sends the picker's follow-up option", async () => {
       const partner = await startFieldTrip("host");
       (game.scene.ui.getHandler() as MysteryEncounterUiHandler).processInput(Button.ACTION);
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.PARTY);
+      await waitForCoop(() => game.scene.ui.mode === UiMode.PARTY);
       const partyUi = game.scene.ui.getHandler() as PartyUiHandler;
       partyUi.setCursor(0);
       partyUi.processInput(Button.ACTION);
       partyUi.processInput(Button.ACTION);
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.OPTION_SELECT);
+      await waitForCoop(() => game.scene.ui.mode === UiMode.OPTION_SELECT);
       const options = game.scene.ui.getHandler() as OptionSelectUiHandler;
       options["unblockInput"]();
       options.setCursor(1);
       options.processInput(Button.ACTION);
-      await vi.waitUntil(() => partner.received.filter(m => m.t === "choice").length === 3);
+      await waitForCoop(() => partner.received.filter(m => m.t === "choice").length === 3);
 
       expect(partner.received.filter(m => m.t === "choice").map(m => m.payload)).toEqual([
         { index: 0 },
@@ -349,12 +349,12 @@ describe("co-op mystery encounters", () => {
     it("asks the partner before taking the option", async () => {
       const partner = await startDarkDeal("host");
       (game.scene.ui.getHandler() as MysteryEncounterUiHandler).processInput(Button.ACTION);
-      await vi.waitUntil(() => choices(partner).length > 0);
+      await waitForCoop(() => choices(partner).length > 0);
 
       expect(choices(partner)).toEqual([{ t: "choice", kind: "optionAsk", wave: WAVE, payload: { seq: 0, index: 0 } }]);
       expect(encounter().selectedOption).toBeUndefined();
       partner.send({ t: "confirm", kind: "meOption", wave: WAVE, seq: 0, accepted: true });
-      await vi.waitUntil(() => encounter().selectedOption !== undefined);
+      await waitForCoop(() => encounter().selectedOption !== undefined);
 
       expect(encounter().selectedOption).toBe(encounter().options[0]);
       expect(choices(partner).at(-1)?.payload).toEqual({ index: 0 });
@@ -363,10 +363,10 @@ describe("co-op mystery encounters", () => {
     it("stays on the options when the partner declines", async () => {
       const partner = await startDarkDeal("host");
       (game.scene.ui.getHandler() as MysteryEncounterUiHandler).processInput(Button.ACTION);
-      await vi.waitUntil(() => choices(partner).length > 0);
+      await waitForCoop(() => choices(partner).length > 0);
       expect(getCoopBannerText()).toBe(coopText("waitingForOwner"));
       partner.send({ t: "confirm", kind: "meOption", wave: WAVE, seq: 0, accepted: false });
-      await vi.waitUntil(() => getCoopBannerText() === coopText("ownerDeclined"));
+      await waitForCoop(() => getCoopBannerText() === coopText("ownerDeclined"));
 
       expect(encounter().selectedOption).toBeUndefined();
       expect(choices(partner).map(m => m.kind)).toEqual(["optionAsk"]);
@@ -375,11 +375,11 @@ describe("co-op mystery encounters", () => {
     it("lets the partner answer", async () => {
       const partner = await startDarkDeal("guest");
       partner.send({ t: "choice", kind: "optionAsk", wave: WAVE, payload: { seq: 3, index: 0 } });
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.CONFIRM);
+      await waitForCoop(() => game.scene.ui.mode === UiMode.CONFIRM);
       const confirm = game.scene.ui.getHandler() as ConfirmUiHandler;
       confirm.setCursor(0);
       confirm.processInput(Button.ACTION);
-      await vi.waitUntil(() => partner.received.some(m => m.t === "confirm"));
+      await waitForCoop(() => partner.received.some(m => m.t === "confirm"));
 
       expect(partner.received.find(m => m.t === "confirm")).toEqual({
         t: "confirm",

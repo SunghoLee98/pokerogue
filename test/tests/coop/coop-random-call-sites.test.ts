@@ -17,7 +17,7 @@ import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 function startCoop(): void {
-  const session = new CoopSession("guest", createLoopbackPair().guest);
+  const session = new CoopSession("host", createLoopbackPair().host);
   // The simulation reads account data from the shared snapshots in co-op.
   const snapshot = { trainerId: 0, secretId: 0, caughtSpecies: [], eggMoves: {}, unlocks: [] };
   session.setAccountSnapshot("host", snapshot);

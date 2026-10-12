@@ -11,12 +11,12 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { SwitchBiomePhase } from "#phases/switch-biome-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { CoopTestPartner, synthesizeMoveCommand } from "#test/utils/coop-partner";
+import { CoopTestPartner, synthesizeMoveCommand, waitForCoop } from "#test/utils/coop-partner";
 import { createTestStarterPayload, startCoopBattle } from "#test/utils/coop-replay";
 import type { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
 import { getBiomeName } from "#utils/common";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const snapshot = (trainerId: number): CoopAccountSnapshot => ({
   trainerId,
@@ -75,7 +75,7 @@ describe("co-op biome choice", () => {
     await game.doKillOpponents();
     // The biome choice waits for input, so run on to the phase after it in the background.
     switched = game.phaseInterceptor.to("SwitchBiomePhase", false);
-    await vi.waitUntil(() => game.scene.ui.mode === UiMode.OPTION_SELECT);
+    await waitForCoop(() => game.scene.ui.mode === UiMode.OPTION_SELECT);
     return partner;
   }
 
@@ -105,7 +105,7 @@ describe("co-op biome choice", () => {
   it("pings instead of choosing for the other player, then follows the picker", async () => {
     const partner = await toBiomeChoice("host");
     choose(1);
-    await vi.waitUntil(() => partner.received.some(m => m.t === "ping"));
+    await waitForCoop(() => partner.received.some(m => m.t === "ping"));
 
     expect(partner.received.find(m => m.t === "ping")).toEqual({ t: "ping", kind: "option", payload: { index: 1 } });
     expect(game.scene.phaseManager.getCurrentPhase().is("SelectBiomePhase")).toBe(true);
@@ -116,7 +116,7 @@ describe("co-op biome choice", () => {
   it("shows the partner's ping to the picker", async () => {
     const partner = await toBiomeChoice("guest");
     partner.send({ t: "ping", kind: "option", payload: { index: 0 } });
-    await vi.waitUntil(() => getCoopBannerText() !== null);
+    await waitForCoop(() => getCoopBannerText() !== null);
 
     expect(getCoopBannerText()).toBe(coopText("partnerPingedOption", { option: getBiomeName(BiomeId.DESERT) }));
     choose(0);

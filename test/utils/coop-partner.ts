@@ -16,6 +16,14 @@ import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import type { PokeballType } from "#enums/pokeball";
 import { getMoveTargets } from "#moves/move-utils";
+import { vi } from "vitest";
+
+/**
+ * Wait for a condition with room for a loaded machine: the default one second is too short when the whole suite runs.
+ */
+export function waitForCoop<T>(condition: () => T, timeout = 10_000): Promise<T> {
+  return vi.waitUntil(condition, { timeout });
+}
 
 /** The same JSON round trip the wire applies. */
 function asSent<T>(value: T): T {

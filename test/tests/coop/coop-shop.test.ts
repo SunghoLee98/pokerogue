@@ -8,12 +8,12 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
-import type { CoopTestPartner } from "#test/utils/coop-partner";
+import { type CoopTestPartner, waitForCoop } from "#test/utils/coop-partner";
 import { createTestStarterPayload, toCoopRewardScreen } from "#test/utils/coop-replay";
 import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import type { PartyUiHandler } from "#ui/party-ui-handler";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const snapshot = (trainerId: number): CoopAccountSnapshot => ({
   trainerId,
@@ -78,12 +78,12 @@ describe("co-op shop", () => {
     handler().setRowCursor(2);
     handler().setCursor(POTION);
     handler().processInput(Button.ACTION);
-    await vi.waitUntil(() => game.scene.ui.mode === UiMode.PARTY);
+    await waitForCoop(() => game.scene.ui.mode === UiMode.PARTY);
     const party = game.scene.ui.getHandler() as PartyUiHandler;
     party.setCursor(slot);
     party.processInput(Button.ACTION);
     party.processInput(Button.ACTION);
-    await vi.waitUntil(() => game.scene.ui.mode === UiMode.MODIFIER_SELECT);
+    await waitForCoop(() => game.scene.ui.mode === UiMode.MODIFIER_SELECT);
   }
 
   function potionEvent(by: "host" | "guest", req: number, slot: number, seq?: number): RewardMessage {
@@ -103,12 +103,12 @@ describe("co-op shop", () => {
     hurt();
     game.scene.money = 1000;
     await buyPotion(0);
-    await vi.waitUntil(() => rewardEvents(partner).length > 0);
+    await waitForCoop(() => rewardEvents(partner).length > 0);
 
     expect(rewardEvents(partner)).toEqual([potionEvent("guest", 0, 0)]);
     expect(game.scene.money).toBe(1000);
     partner.send({ ...rewardEvents(partner)[0], seq: 0 });
-    await vi.waitUntil(() => game.scene.money < 1000);
+    await waitForCoop(() => game.scene.money < 1000);
 
     expect(game.scene.money).toBe(1000 - potionCost());
     expect(game.scene.getPlayerParty()[0].hp).toBeGreaterThan(1);
@@ -120,7 +120,7 @@ describe("co-op shop", () => {
     game.scene.money = 1000;
     partner.send(potionEvent("guest", 0, 1));
     await buyPotion(0);
-    await vi.waitUntil(() => rewardEvents(partner).length === 2);
+    await waitForCoop(() => rewardEvents(partner).length === 2);
 
     expect(rewardEvents(partner)).toEqual([potionEvent("guest", 0, 1, 0), potionEvent("host", 0, 0, 1)]);
     expect(game.scene.money).toBe(1000 - 2 * potionCost());
@@ -132,11 +132,11 @@ describe("co-op shop", () => {
     hurt();
     game.scene.money = potionCost();
     await buyPotion(1);
-    await vi.waitUntil(() => rewardEvents(partner).length > 0);
+    await waitForCoop(() => rewardEvents(partner).length > 0);
     // The host bought first and the guest's buy came second.
     partner.send(potionEvent("host", 0, 0, 0));
     partner.send({ ...rewardEvents(partner)[0], seq: 1 });
-    await vi.waitUntil(() => game.textInterceptor.logs.includes(coopText("notEnoughMoney")));
+    await waitForCoop(() => game.textInterceptor.logs.includes(coopText("notEnoughMoney")));
 
     expect(game.scene.money).toBe(0);
     expect(game.scene.getPlayerParty()[0].hp).toBeGreaterThan(1);

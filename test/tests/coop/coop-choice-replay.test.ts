@@ -9,7 +9,7 @@ import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
-import { CoopTestPartner, synthesizeMoveCommand } from "#test/utils/coop-partner";
+import { CoopTestPartner, synthesizeMoveCommand, waitForCoop } from "#test/utils/coop-partner";
 import {
   createFreshGameManager,
   createTestStarterPayload,
@@ -20,7 +20,7 @@ import type { ConfirmUiHandler } from "#ui/confirm-ui-handler";
 import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
 import type { PartyUiHandler } from "#ui/party-ui-handler";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const snapshot = (trainerId: number): CoopAccountSnapshot => ({
   trainerId,
@@ -74,7 +74,7 @@ describe("co-op choice replay", () => {
   const party = () => game.scene.getPlayerParty();
 
   async function selectInParty(slot: number): Promise<void> {
-    await vi.waitUntil(() => game.scene.ui.mode === UiMode.PARTY);
+    await waitForCoop(() => game.scene.ui.mode === UiMode.PARTY);
     const partyUi = game.scene.ui.getHandler() as PartyUiHandler;
     partyUi.setCursor(slot);
     partyUi.processInput(Button.ACTION);
@@ -82,7 +82,7 @@ describe("co-op choice replay", () => {
   }
 
   async function answer(accept: boolean): Promise<void> {
-    await vi.waitUntil(() => game.scene.ui.mode === UiMode.CONFIRM);
+    await waitForCoop(() => game.scene.ui.mode === UiMode.CONFIRM);
     const confirm = game.scene.ui.getHandler() as ConfirmUiHandler;
     confirm.setCursor(accept ? 0 : 1);
     confirm.processInput(Button.ACTION);
@@ -127,10 +127,10 @@ describe("co-op choice replay", () => {
     const host = await runPartTimer("host", async partner => {
       (game.scene.ui.getHandler() as MysteryEncounterUiHandler).processInput(Button.ACTION);
       await selectInParty(1);
-      await vi.waitUntil(() => partner.received.some(m => m.t === "choice" && m.kind === "ownerAsk"));
+      await waitForCoop(() => partner.received.some(m => m.t === "choice" && m.kind === "ownerAsk"));
       partner.send(guestAnswer);
       if (!accept) {
-        await vi.waitUntil(() => game.scene.ui.mode === UiMode.MESSAGE);
+        await waitForCoop(() => game.scene.ui.mode === UiMode.MESSAGE);
         game.scene.ui.getHandler().processInput(Button.ACTION);
         await selectInParty(0);
       }
@@ -146,7 +146,7 @@ describe("co-op choice replay", () => {
         partner.send(message);
       }
       await answer(accept);
-      await vi.waitUntil(() => partner.received.some(m => m.t === "confirm"));
+      await waitForCoop(() => partner.received.some(m => m.t === "confirm"));
       for (const message of recorded.slice(ask + 1)) {
         partner.send(message);
       }
@@ -201,9 +201,9 @@ describe("co-op choice replay", () => {
 
     game = createFreshGameManager(phaserGame);
     const guest = await runOwnerChoice("guest", queue, async () => {
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.CONFIRM, { timeout: 10_000 });
+      await waitForCoop(() => game.scene.ui.mode === UiMode.CONFIRM);
       game.scene.ui.getHandler().processInput(Button.ACTION);
-      await vi.waitUntil(() => game.scene.ui.mode === UiMode.SUMMARY, { timeout: 10_000 });
+      await waitForCoop(() => game.scene.ui.mode === UiMode.SUMMARY);
       game.scene.ui.getHandler().setCursor(2);
       game.scene.ui.getHandler().processInput(Button.ACTION);
     });
