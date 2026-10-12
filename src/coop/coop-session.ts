@@ -12,6 +12,8 @@ export class CoopSession {
   readonly localRole: CoopRole;
   readonly transport: CoopTransport;
   readonly ownership: CoopOwnership;
+  /** The host's active timed event when the run started (`null` for none). Both clients use it instead of the clock. */
+  timedEvent: string | null = null;
   private readonly accountSnapshots = new Map<CoopRole, CoopAccountSnapshot>();
 
   constructor(localRole: CoopRole, transport: CoopTransport, ownership = new CoopOwnership()) {
@@ -59,4 +61,12 @@ export let coopSession: CoopSession | null = null;
 
 export function setCoopSession(session: CoopSession | null): void {
   coopSession = session;
+}
+
+/**
+ * The timed event co-op play uses in place of the clock.
+ * @returns The event name, `null` for no event, or `undefined` outside co-op (follow the clock)
+ */
+export function getCoopTimedEvent(): string | null | undefined {
+  return coopSession ? coopSession.timedEvent : undefined;
 }

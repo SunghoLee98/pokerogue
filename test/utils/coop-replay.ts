@@ -8,17 +8,26 @@
  * @module
  */
 
+import { settings } from "#app/global-settings-manager";
+import { activeOverrides } from "#app/overrides";
 import type { CoopChecksum } from "#coop/coop-desync";
+import { createCoopGameMode, startCoopRun } from "#coop/coop-game-start";
 import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
 import { CoopSession, setCoopSession } from "#coop/coop-session";
 import { createAccountSnapshot } from "#coop/coop-sim-data";
+import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import { type CoopStateSnapshot, captureCoopState, hashCoopState } from "#coop/coop-state-hash";
+import type { CoopTransport } from "#coop/coop-transport";
 import { createLoopbackPair } from "#coop/loopback-transport";
+import { BattleStyle } from "#enums/battle-style";
 import { BattlerIndex } from "#enums/battler-index";
 import { DexAttr } from "#enums/dex-attr";
 import { MoveId } from "#enums/move-id";
+import { Nature } from "#enums/nature";
 import type { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { Unlockables } from "#enums/unlockables";
+import { SelectStarterPhase } from "#phases/select-starter-phase";
 import type { GameData } from "#system/game-data";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
@@ -87,6 +96,61 @@ export function createFreshGameManager(phaserGame: Phaser.Game): GameManager {
   clearInterval(PromptHandler.runInterval);
   PromptHandler.runInterval = undefined;
   return new GameManager(phaserGame);
+}
+
+export interface CoopBattleStartOptions {
+  role: CoopRole;
+  start: CoopStartInfo;
+  /** The connection to the partner. Default: one side of a fresh loopback pair */
+  transport?: CoopTransport;
+}
+
+/**
+ * Transition from the title screen to the first command of a co-op run, through the same path the game takes
+ * once both players are ready: {@linkcode startCoopRun} followed by the tail of `SelectStarterPhase.initBattle`.
+ * Mirrors `ClassicModeHelper.startBattle` (same test overrides, same switch prompt handling).
+ */
+export async function startCoopBattle(game: GameManager, options: CoopBattleStartOptions): Promise<void> {
+  await game.runToTitle();
+
+  if (game.override.disableShinies) {
+    game.override.shiny(false).enemyShiny(false);
+  }
+  if (game.override.normalizeIVs) {
+    game.override.playerIVs(31).enemyIVs(31);
+  }
+  if (game.override.normalizeNatures) {
+    game.override.nature(Nature.HARDY).enemyNature(Nature.HARDY);
+  }
+
+  const transport = options.transport ?? createLoopbackPair()[options.role];
+  game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+    game.scene.gameMode = createCoopGameMode();
+    const selectStarterPhase = new SelectStarterPhase();
+    game.scene.phaseManager.pushNew("EncounterPhase", false);
+    startCoopRun(options.role, transport, options.start, () => selectStarterPhase.initBattle([]));
+  });
+
+  await game.phaseInterceptor.to("EncounterPhase");
+  if (activeOverrides.ENEMY_HELD_ITEMS_OVERRIDE.length === 0 && game.override.removeEnemyStartingItems) {
+    game.removeEnemyHeldItems();
+  }
+
+  if (settings.general.battleStyle === BattleStyle.SWITCH) {
+    for (let i = 0; i < 2; i++) {
+      game.onNextPrompt(
+        "CheckSwitchPhase",
+        UiMode.CONFIRM,
+        () => {
+          game.setMode(UiMode.MESSAGE);
+          game.endPhase();
+        },
+        () => game.isCurrentPhase("CommandPhase") || game.isCurrentPhase("TurnInitPhase"),
+      );
+    }
+  }
+
+  await game.phaseInterceptor.to("CommandPhase");
 }
 
 /** The field slot each role commands. */
