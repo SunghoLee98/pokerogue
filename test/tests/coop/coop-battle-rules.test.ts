@@ -1,3 +1,4 @@
+import { applyCoopBossStatMultiplier, COOP_FINAL_BOSS_STAT_MULTIPLIER } from "#coop/coop-battle-rules";
 import { beginCoopSession, createCoopGameMode } from "#coop/coop-game-start";
 import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
 import { coopSession, setCoopSession } from "#coop/coop-session";
@@ -9,10 +10,12 @@ import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import type { Pokemon } from "#field/pokemon";
 import * as MysteryEncounters from "#mystery-encounters/mystery-encounter-biomes";
 import { GameManager } from "#test/framework/game-manager";
 import { createFreshGameManager, createTestStarterPayload, startCoopBattle } from "#test/utils/coop-replay";
 import { runMysteryEncounterToEnd } from "#test/utils/encounter-test-utils";
+import { NumberHolder } from "#utils/common";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -127,6 +130,65 @@ describe("co-op battle rules", () => {
       expect(game.scene.currentBattle.double).toBe(true);
       expect(game.scene.getEnemyParty()).toHaveLength(1);
       expect(game.scene.getPlayerField().filter(p => p.isOnField())).toHaveLength(2);
+    });
+  });
+
+  describe("final boss phase one", () => {
+    /** The enemy's stats as the solo game computes them, leaving the co-op stats in place. */
+    function soloStats(pokemon: Pokemon): number[] {
+      const session = coopSession;
+      const hp = pokemon.hp;
+      setCoopSession(null);
+      try {
+        pokemon.calculateStats();
+        return [...pokemon.stats];
+      } finally {
+        setCoopSession(session);
+        pokemon.calculateStats();
+        pokemon.hp = hp;
+      }
+    }
+
+    beforeEach(() => {
+      game.override.startingWave(200).startingBiome(BiomeId.END);
+    });
+
+    it("boosts every stat by half in co-op", async () => {
+      await startCoopBattle(game, { role: "host", start: startInfo() });
+      const eternatus = game.scene.getEnemyField()[0];
+      expect(eternatus.formIndex).toBe(0);
+
+      const solo = soloStats(eternatus);
+      expect(eternatus.stats).toEqual(solo.map(value => Math.floor(value * COOP_FINAL_BOSS_STAT_MULTIPLIER)));
+      expect(eternatus.hp).toBe(eternatus.getMaxHp());
+    });
+
+    it("drops the boost in phase two", async () => {
+      await startCoopBattle(game, { role: "host", start: startInfo() });
+      const eternatus = game.scene.getEnemyField()[0];
+
+      eternatus.formIndex = 1;
+      eternatus.calculateStats();
+
+      expect(eternatus.stats).toEqual(soloStats(eternatus));
+    });
+
+    it("leaves other enemies alone", async () => {
+      game.override.startingWave(199);
+      await startCoopBattle(game, { role: "host", start: startInfo() });
+      const enemy = game.scene.getEnemyField()[0];
+
+      expect(enemy.stats).toEqual(soloStats(enemy));
+    });
+
+    it("does nothing in solo", async () => {
+      await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+      const eternatus = game.scene.getEnemyField()[0];
+      expect(eternatus.species.speciesId).toBe(SpeciesId.ETERNATUS);
+
+      const stat = new NumberHolder(100);
+      applyCoopBossStatMultiplier(eternatus, stat);
+      expect(stat.value).toBe(100);
     });
   });
 

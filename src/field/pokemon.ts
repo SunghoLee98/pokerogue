@@ -18,6 +18,7 @@ import { FusionSpeciesFormEvolution, SpeciesFormEvolution, validateShedinjaEvo }
 import { BASE_HIDDEN_ABILITY_RATE, BASE_SHINY_CHANCE, SHINY_EPIC_CHANCE, SHINY_VARIANT_CHANCE } from "#balance/rates";
 import type { FORCED_RIVAL_SIGNATURE_MOVES } from "#balance/signature-moves";
 import { getStarterValueFriendshipCap, TRAINER_MAX_FRIENDSHIP_WAVE, TRAINER_MIN_FRIENDSHIP } from "#balance/starters";
+import { applyCoopBossStatMultiplier } from "#coop/coop-battle-rules";
 import { getPokemonSimData, getWorldSimData } from "#coop/coop-sim-data";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
 import { NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
@@ -1589,6 +1590,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         if (this.hasAbility(AbilityId.WONDER_GUARD, false, true)) {
           statHolder.value = 1;
         }
+        applyCoopBossStatMultiplier(this, statHolder);
         if (this.hp > statHolder.value || this.hp === undefined) {
           this.hp = statHolder.value;
         } else if (this.hp) {
@@ -1608,6 +1610,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           );
         }
         globalScene.applyModifier(PokemonIncrementingStatModifier, this.isPlayer(), this, s, statHolder);
+        applyCoopBossStatMultiplier(this, statHolder);
       }
 
       statHolder.value = Phaser.Math.Clamp(statHolder.value, 1, Number.MAX_SAFE_INTEGER);
