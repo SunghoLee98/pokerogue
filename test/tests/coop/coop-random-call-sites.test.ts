@@ -16,7 +16,14 @@ import * as Utils from "#utils/common";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const startCoop = () => setCoopSession(new CoopSession("guest", createLoopbackPair().guest));
+function startCoop(): void {
+  const session = new CoopSession("guest", createLoopbackPair().guest);
+  // The simulation reads account data from the shared snapshots in co-op.
+  const snapshot = { trainerId: 0, secretId: 0, caughtSpecies: [], eggMoves: {}, unlocks: [] };
+  session.setAccountSnapshot("host", snapshot);
+  session.setAccountSnapshot("guest", snapshot);
+  setCoopSession(session);
+}
 
 describe("co-op seeded randomness at call sites", () => {
   let phaserGame: Phaser.Game;
