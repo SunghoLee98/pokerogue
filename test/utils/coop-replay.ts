@@ -9,21 +9,24 @@
  */
 
 import { settings } from "#app/global-settings-manager";
+import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { activeOverrides } from "#app/overrides";
 import type { CoopChecksum } from "#coop/coop-desync";
 import { createCoopGameMode, startCoopRun } from "#coop/coop-game-start";
 import type { CoopAccountSnapshot, CoopRole, CoopStarterPayload } from "#coop/coop-protocol";
-import { CoopSession, setCoopSession } from "#coop/coop-session";
+import { setCoopSession } from "#coop/coop-session";
 import { createAccountSnapshot } from "#coop/coop-sim-data";
 import { CoopStarterSelection, type CoopStartInfo } from "#coop/coop-starter-selection";
 import { type CoopStateSnapshot, captureCoopState, hashCoopState } from "#coop/coop-state-hash";
 import type { CoopTransport } from "#coop/coop-transport";
 import { createLoopbackPair } from "#coop/loopback-transport";
+import { Gender } from "#data/gender";
 import { BattleStyle } from "#enums/battle-style";
 import { BattlerIndex } from "#enums/battler-index";
 import { DexAttr } from "#enums/dex-attr";
 import { MoveId } from "#enums/move-id";
 import { Nature } from "#enums/nature";
+import { PokeballType } from "#enums/pokeball";
 import type { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { Unlockables } from "#enums/unlockables";
@@ -76,7 +79,7 @@ export interface CoopReplayOptions {
   localCommand: CoopReplayCommandFn;
   /** Where the other player's commands come from: live (when recording) or a recorded log (when replaying) */
   remote: { command: CoopReplayCommandFn } | { log: CoopReplayLog };
-  /** Replaces the host snapshot the simulation reads, to inject a divergence */
+  /** Replaces the host snapshot in the start message, to inject a divergence */
   worldDataOverride?: CoopAccountSnapshot;
   /** The two starters: index 0 belongs to the host, index 1 to the guest */
   species: [SpeciesId, SpeciesId];
@@ -248,8 +251,11 @@ function findRecordedCommand(log: CoopReplayLog, by: CoopRole, wave: number, tur
   return { moveId: input.moveId, target: input.target };
 }
 
-/** Make the local game data the role's account, and start a session holding both players' snapshots. */
-function startSession(game: GameManager, options: CoopReplayOptions): CoopSession {
+/**
+ * Make the local game data the role's account.
+ * @returns Both players' account snapshots
+ */
+function prepareAccounts(game: GameManager, options: CoopReplayOptions): Record<CoopRole, CoopAccountSnapshot> {
   const { role, accounts } = options;
   const gameData = game.scene.gameData;
   const base = createAccountSnapshot(gameData);
@@ -259,12 +265,32 @@ function startSession(game: GameManager, options: CoopReplayOptions): CoopSessio
   if (JSON.stringify(createAccountSnapshot(gameData)) !== JSON.stringify(snapshots[role])) {
     throw new Error(`local game data does not match the ${role} account snapshot`);
   }
+  return snapshots;
+}
 
-  const session = new CoopSession(role, createLoopbackPair()[role]);
-  session.setAccountSnapshot("host", options.worldDataOverride ?? snapshots.host);
-  session.setAccountSnapshot("guest", snapshots.guest);
-  setCoopSession(session);
-  return session;
+/**
+ * A fixed starter payload for a species, as a player would send it.
+ * Fixed values (no random rolls), so that recording and replaying runs pick exactly the same starters.
+ */
+export function createTestStarterPayload(speciesId: SpeciesId): CoopStarterPayload {
+  const species = speciesDataRegistry.getSpecies(speciesId);
+  return {
+    speciesId,
+    formIndex: 0,
+    gender: species.malePercent === null ? Gender.GENDERLESS : Gender.MALE,
+    shiny: false,
+    variant: 0,
+    abilityIndex: 0,
+    passive: false,
+    nature: Nature.HARDY,
+    ivs: [20, 20, 20, 20, 20, 20],
+    moveset: [],
+    teraType: species.type1,
+    friendship: species.baseFriendship,
+    pokeball: PokeballType.POKEBALL,
+    pokerus: false,
+    luck: 0,
+  };
 }
 
 /** Select both players' commands for the current turn, recording them. */
@@ -295,7 +321,16 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
   game.override.battleStyle("double").startingLevel(100).enemyMoveset(MoveId.SPLASH).disableTrainerWaves();
   game.override.shiny(false);
 
-  const session = startSession(game, options);
+  const snapshots = prepareAccounts(game, options);
+  const start: CoopStartInfo = {
+    seed: options.seed ?? "coop-replay",
+    accounts: { host: options.worldDataOverride ?? snapshots.host, guest: snapshots.guest },
+    picks: {
+      host: [createTestStarterPayload(options.species[0])],
+      guest: [createTestStarterPayload(options.species[1])],
+    },
+    timedEvent: null,
+  };
   const log: CoopReplayLog = { inputs: [], checksums: [], enemyIds: [], states: [] };
   const checkpoint = () => {
     const { waveIndex, turn } = game.scene.currentBattle;
@@ -309,12 +344,9 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
   };
 
   try {
-    // Both clients sow the shared seed before any pokemon is created, so starter ids agree.
-    game.override.seed(options.seed ?? "coop-replay");
-    await game.classicMode.startBattle(...options.species);
-    const party = game.scene.getPlayerParty();
-    session.ownership.set(party[0].id, "host");
-    session.ownership.set(party[1].id, "guest");
+    // The real co-op start: both clients sow the shared seed before creating the starters, so starter ids agree,
+    // and the starters' owners are registered from the picks.
+    await startCoopBattle(game, { role: options.role, start });
     waveStart();
 
     let cleared = 0;

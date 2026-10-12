@@ -8,12 +8,8 @@ import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import { computeCoopStateHash } from "#coop/coop-state-hash";
 import type { CoopTransport } from "#coop/coop-transport";
 import { createLoopbackPair } from "#coop/loopback-transport";
-import { Gender } from "#data/gender";
 import { EventType } from "#enums/event-type";
 import { MoveId } from "#enums/move-id";
-import { Nature } from "#enums/nature";
-import { PokeballType } from "#enums/pokeball";
-import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Unlockables } from "#enums/unlockables";
 import { GameManager } from "#test/framework/game-manager";
@@ -21,6 +17,7 @@ import {
   applyTestAccount,
   type CoopTestAccount,
   createFreshGameManager,
+  createTestStarterPayload,
   selectCoopStart,
   snapshotForTestAccount,
   startCoopBattle,
@@ -29,26 +26,6 @@ import type { TimedEvent } from "#types/game-events";
 import { randSeedInt } from "#utils/common";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-
-function testPick(speciesId: SpeciesId): CoopStarterPayload {
-  return {
-    speciesId,
-    formIndex: 0,
-    gender: Gender.MALE,
-    shiny: false,
-    variant: 0,
-    abilityIndex: 0,
-    passive: false,
-    nature: Nature.HARDY,
-    ivs: [20, 20, 20, 20, 20, 20],
-    moveset: [],
-    teraType: PokemonType.NORMAL,
-    friendship: 50,
-    pokeball: PokeballType.POKEBALL,
-    pokerus: false,
-    luck: 0,
-  };
-}
 
 const snapshot = (trainerId: number): CoopAccountSnapshot => ({
   trainerId,
@@ -62,7 +39,7 @@ function startInfo(host: SpeciesId[], guest: SpeciesId[], timedEvent: string | n
   return {
     seed: "coop-start-test",
     accounts: { host: snapshot(1), guest: snapshot(2) },
-    picks: { host: host.map(testPick), guest: guest.map(testPick) },
+    picks: { host: host.map(createTestStarterPayload), guest: guest.map(createTestStarterPayload) },
     timedEvent,
   };
 }
@@ -228,7 +205,7 @@ describe("co-op start end to end", () => {
       .filter(([level]) => level <= 5)
       .map(([, move]) => move);
     const moveset = [levelMoves[0], speciesEggMoves[SpeciesId.BULBASAUR][0]];
-    return [{ ...testPick(SpeciesId.BULBASAUR), moveset }, testPick(SpeciesId.PIKACHU)];
+    return [{ ...createTestStarterPayload(SpeciesId.BULBASAUR), moveset }, createTestStarterPayload(SpeciesId.PIKACHU)];
   }
 
   async function runRole(role: CoopRole, start: CoopStartInfo, transport: CoopTransport): Promise<RoleRun> {
@@ -252,7 +229,7 @@ describe("co-op start end to end", () => {
       host: { picks: hostPicks(), account: snapshotForTestAccount(gameData, accounts.host) },
       // Picking the same species as the partner is allowed.
       guest: {
-        picks: [testPick(SpeciesId.CHARMANDER), testPick(SpeciesId.BULBASAUR)],
+        picks: [createTestStarterPayload(SpeciesId.CHARMANDER), createTestStarterPayload(SpeciesId.BULBASAUR)],
         account: snapshotForTestAccount(gameData, accounts.guest),
       },
     });
