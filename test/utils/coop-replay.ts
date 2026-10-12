@@ -37,6 +37,7 @@ import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { DexAttr } from "#enums/dex-attr";
 import { MoveId } from "#enums/move-id";
+import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Nature } from "#enums/nature";
 import { PokeballType } from "#enums/pokeball";
 import type { SpeciesId } from "#enums/species-id";
@@ -54,7 +55,9 @@ import {
   synthesizeMoveCommand,
   synthesizeRunCommand,
 } from "#test/utils/coop-partner";
+import type { BattleMessageUiHandler } from "#ui/battle-message-ui-handler";
 import type { ConfirmUiHandler } from "#ui/confirm-ui-handler";
+import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
 import { getEnumValues } from "#utils/enums";
 import { vi } from "vitest";
 
@@ -156,27 +159,7 @@ export interface CoopBattleStartOptions {
  * Mirrors `ClassicModeHelper.startBattle` (same test overrides, same switch prompt handling).
  */
 export async function startCoopBattle(game: GameManager, options: CoopBattleStartOptions): Promise<void> {
-  await game.runToTitle();
-
-  if (game.override.disableShinies) {
-    game.override.shiny(false).enemyShiny(false);
-  }
-  if (game.override.normalizeIVs) {
-    game.override.playerIVs(31).enemyIVs(31);
-  }
-  if (game.override.normalizeNatures) {
-    game.override.nature(Nature.HARDY).enemyNature(Nature.HARDY);
-  }
-
-  const transport = options.transport ?? createLoopbackPair()[options.role];
-  game.onNextPrompt("TitlePhase", UiMode.TITLE, async () => {
-    game.scene.gameMode = createCoopGameMode();
-    const selectStarterPhase = new SelectStarterPhase();
-    game.scene.phaseManager.pushNew("EncounterPhase", false);
-    await startCoopRun(options.role, transport, options.start, () => selectStarterPhase.initBattle([]));
-  });
-
-  await game.phaseInterceptor.to("EncounterPhase");
+  await toCoopEncounterPhase(game, options);
   if (activeOverrides.ENEMY_HELD_ITEMS_OVERRIDE.length === 0 && game.override.removeEnemyStartingItems) {
     game.removeEnemyHeldItems();
   }
@@ -196,6 +179,66 @@ export async function startCoopBattle(game: GameManager, options: CoopBattleStar
   }
 
   await game.phaseInterceptor.to("CommandPhase");
+}
+
+/**
+ * Start a co-op run whose first wave is the given mystery encounter and wait until its options are shown,
+ * the way `GameManager.runToMysteryEncounter` does in solo.
+ */
+export async function startCoopEncounter(
+  game: GameManager,
+  options: CoopBattleStartOptions & { encounter: MysteryEncounterType },
+): Promise<void> {
+  game.override.disableTrainerWaves().mysteryEncounterChance(100).mysteryEncounter(options.encounter);
+  await toCoopEncounterPhase(game, options, () =>
+    game.onNextPrompt(
+      "EncounterPhase",
+      UiMode.MESSAGE,
+      () => (game.scene.ui.getHandler() as BattleMessageUiHandler).processInput(Button.ACTION),
+      () => game.isCurrentPhase("MysteryEncounterPhase"),
+      true,
+    ),
+  );
+  game.onNextPrompt(
+    "MysteryEncounterPhase",
+    UiMode.MESSAGE,
+    () => (game.scene.ui.getHandler() as MysteryEncounterUiHandler).processInput(Button.ACTION),
+    () => game.isCurrentPhase("MysteryEncounterOptionSelectedPhase", "CommandPhase", "TurnInitPhase"),
+  );
+  await game.phaseInterceptor.to("MysteryEncounterPhase");
+  const handler = game.scene.ui.getHandler() as MysteryEncounterUiHandler;
+  // Options take input after a delay meant to prevent accidental presses.
+  handler.unblockInput();
+}
+
+/** From the title screen into the first `EncounterPhase` of a co-op run. */
+async function toCoopEncounterPhase(
+  game: GameManager,
+  options: CoopBattleStartOptions,
+  afterTitlePrompt?: () => void,
+): Promise<void> {
+  await game.runToTitle();
+
+  if (game.override.disableShinies) {
+    game.override.shiny(false).enemyShiny(false);
+  }
+  if (game.override.normalizeIVs) {
+    game.override.playerIVs(31).enemyIVs(31);
+  }
+  if (game.override.normalizeNatures) {
+    game.override.nature(Nature.HARDY).enemyNature(Nature.HARDY);
+  }
+
+  const transport = options.transport ?? createLoopbackPair()[options.role];
+  game.onNextPrompt("TitlePhase", UiMode.TITLE, async () => {
+    game.scene.gameMode = createCoopGameMode();
+    const selectStarterPhase = new SelectStarterPhase();
+    game.scene.phaseManager.pushNew("EncounterPhase", false);
+    await startCoopRun(options.role, transport, options.start, () => selectStarterPhase.initBattle([]));
+  });
+  afterTitlePrompt?.();
+
+  await game.phaseInterceptor.to("EncounterPhase");
 }
 
 /**

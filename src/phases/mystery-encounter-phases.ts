@@ -1,6 +1,7 @@
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { routeCoopEncounterOption } from "#coop/coop-encounter";
 import { queueCoopFieldSummons } from "#coop/coop-field";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -73,6 +74,9 @@ export class MysteryEncounterPhase extends Phase {
    * @param index
    */
   handleOptionSelect(option: MysteryEncounterOption, index: number): boolean {
+    if (routeCoopEncounterOption(index)) {
+      return true;
+    }
     // Set option selected flag
     globalScene.currentBattle.mysteryEncounter!.selectedOption = option;
 
