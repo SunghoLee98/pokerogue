@@ -4,6 +4,7 @@
  * @module
  */
 
+import { CoopInputBroker } from "#coop/coop-input-broker";
 import { CoopOwnership } from "#coop/coop-ownership";
 import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
 import type { CoopTransport } from "#coop/coop-transport";
@@ -12,14 +13,26 @@ export class CoopSession {
   readonly localRole: CoopRole;
   readonly transport: CoopTransport;
   readonly ownership: CoopOwnership;
+  /** The partner's inputs, kept until the game reaches the point that needs them. */
+  readonly inputs: CoopInputBroker;
   /** The host's active timed event when the run started (`null` for none). Both clients use it instead of the clock. */
   timedEvent: string | null = null;
   private readonly accountSnapshots = new Map<CoopRole, CoopAccountSnapshot>();
+  private decisionSeq = 0;
 
   constructor(localRole: CoopRole, transport: CoopTransport, ownership = new CoopOwnership()) {
     this.localRole = localRole;
     this.transport = transport;
     this.ownership = ownership;
+    this.inputs = new CoopInputBroker(transport);
+  }
+
+  /**
+   * The sequence number of the next choice made while a turn runs (a switch-in, a release to make room).
+   * Both simulations reach these choices in the same order, so both count the same numbers.
+   */
+  nextDecisionSeq(): number {
+    return this.decisionSeq++;
   }
 
   get remoteRole(): CoopRole {
@@ -59,7 +72,11 @@ export class CoopSession {
 /** The active co-op session, or `null` outside co-op. */
 export let coopSession: CoopSession | null = null;
 
+/** Replace the active session. The previous session stops listening for the partner's inputs. */
 export function setCoopSession(session: CoopSession | null): void {
+  if (coopSession && coopSession !== session) {
+    coopSession.inputs.dispose();
+  }
   coopSession = session;
 }
 

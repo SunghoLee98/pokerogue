@@ -12,7 +12,7 @@ import type { SpeciesId } from "#enums/species-id";
 import type { Variant } from "#sprites/variant";
 
 /** Bumped whenever a message shape changes incompatibly. Peers with different versions refuse to connect. */
-export const COOP_PROTOCOL_VERSION = 1;
+export const COOP_PROTOCOL_VERSION = 2;
 
 export type CoopRole = "host" | "guest";
 
@@ -61,8 +61,36 @@ export interface CoopStarterPayload {
   luck: number;
 }
 
+/** A `TurnCommand` (`src/battle.ts`) as JSON. Its `move` and `args` hold plain data only. */
+export interface CoopTurnCommandData {
+  command: number;
+  cursor?: number;
+  move?: { move: number; targets: number[]; useMode: number };
+  targets?: number[];
+  skip?: boolean;
+  args?: unknown[];
+}
+
+/** One player's final command for one field slot, as the simulation will run it. */
+export interface CoopTurnCommandPayload {
+  fieldIndex: number;
+  turnCommand: CoopTurnCommandData;
+  /** The slot's pre-turn command (terastallizing), `null` if none */
+  preTurnCommand: CoopTurnCommandData | null;
+}
+
+/**
+ * A choice a player makes while the turn is running, keyed by a sequence number both simulations count the same way.
+ * - `switch`: the pokemon sent out (`slotIndex`, a `PartyOption` in `option`); `slotIndex` outside the party for none
+ * - `capture`: after catching with a full roster, the pokemon released to make room (`replace`) or the catch let go
+ */
+export type CoopDecision =
+  | { kind: "switch"; seq: number; slotIndex: number; option: number }
+  | { kind: "capture"; seq: number; action: "replace"; releasedId: number; insertIndex: number }
+  | { kind: "capture"; seq: number; action: "keepOut" };
+
 // Payloads below are narrowed by later co-op plans.
-export type TurnCommandPayload = Record<string, unknown>;
+export type TurnCommandPayload = CoopTurnCommandPayload;
 export type CoopSessionSnapshot = Record<string, unknown>;
 export type CoopChoiceKind = string;
 
@@ -92,7 +120,8 @@ export type CoopMessage =
   | { t: "checksum"; wave: number; turn: number; hash: string }
   /** The guest requests without `seq`; the host confirms by attaching one. */
   | { t: "shopBuy"; wave: number; seq?: number; option: number; target: number }
-  | { t: "confirm"; kind: "mePokemon" | "meOption" | "flee"; wave: number; accepted: boolean }
+  /** For `flee`, `turn` is the battle turn of the declined proposal. */
+  | { t: "confirm"; kind: "mePokemon" | "meOption" | "flee"; wave: number; turn: number; accepted: boolean }
   | { t: "resume"; session: CoopSessionSnapshot }
   | { t: "bye" };
 
