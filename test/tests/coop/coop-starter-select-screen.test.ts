@@ -1,5 +1,4 @@
 import { leaveCoop, openCoopLobby } from "#coop/coop-lobby";
-import { createCoopStarterSelectUi } from "#coop/coop-starter-select-ui";
 import { createLoopbackPair } from "#coop/loopback-transport";
 import { Button } from "#enums/buttons";
 import { Nature } from "#enums/nature";
@@ -59,11 +58,7 @@ describe("co-op on the starter select screen", () => {
       { role: "guest", transport: pair.guest, peerAccountName: "Hosty" },
       { getAccount: () => emptySnapshot },
     );
-    handler["coopUi"] = createCoopStarterSelectUi(
-      handler["starterSelectContainer"],
-      { iconPosition: i => [0, i * 10], statusPosition: [0, 0] },
-      () => {},
-    );
+    handler["setUpCoop"]();
     handler["partyStarters"].push(starter(SpeciesId.CHARMANDER));
     handler.partyStarterIds.push(SpeciesId.CHARMANDER);
 
@@ -80,7 +75,7 @@ describe("co-op on the starter select screen", () => {
       return Promise.resolve();
     });
     vi.spyOn(ui, "setMode").mockResolvedValue();
-    return { lobby, confirms };
+    return { pair, lobby, confirms };
   }
 
   const messageBoxVisible = () => handler["starterSelectMessageBoxContainer"].visible;

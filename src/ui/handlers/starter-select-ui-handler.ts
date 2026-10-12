@@ -619,16 +619,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.setCursor(0);
       this.tryUpdateValue(0);
 
-      const coopLayout: CoopStarterSelectLayout = {
-        iconPosition: i => [teamWindowX + 7, calcStarterIconY(i)],
-        statusPosition: [teamWindowX - 4, 162],
-      };
-      this.coopUi = createCoopStarterSelectUi(this.starterSelectContainer, coopLayout, starters => {
-        this.getUi().setMode(UiMode.STARTER_SELECT);
-        const callback = this.starterSelectCallback;
-        this.starterSelectCallback = null;
-        callback?.(starters);
-      });
+      this.setUpCoop();
 
       handleTutorial(Tutorial.STARTER_SELECT);
 
@@ -636,6 +627,20 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
 
     return false;
+  }
+
+  /** Add the co-op controls to the screen when in a co-op lobby. */
+  private setUpCoop(): void {
+    const coopLayout: CoopStarterSelectLayout = {
+      iconPosition: i => [teamWindowX + 7, calcStarterIconY(i)],
+      statusPosition: [teamWindowX - 4, 162],
+    };
+    this.coopUi = createCoopStarterSelectUi(this.starterSelectContainer, coopLayout, starters => {
+      this.getUi().setMode(UiMode.STARTER_SELECT);
+      const callback = this.starterSelectCallback;
+      this.starterSelectCallback = null;
+      callback?.(starters);
+    });
   }
 
   /**
