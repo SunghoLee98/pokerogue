@@ -120,6 +120,20 @@ export class CoopTestPartner {
     this.send({ t: "choice", kind: decision.kind, wave, payload: decision });
   }
 
+  /**
+   * Play the host's part on the reward screen for a guest client: number each of its requests in arrival order and
+   * send them back, as the host does.
+   * @param firstSeq - The number to give the first request
+   */
+  orderRewards(firstSeq = 0): void {
+    let seq = firstSeq;
+    this.onReceive(message => {
+      if (message.t === "reward" && message.seq === undefined) {
+        this.send({ ...message, seq: seq++ });
+      }
+    });
+  }
+
   /** The battle commands the local client sent. */
   get sentCommands(): Extract<CoopMessage, { t: "turnCommand" }>[] {
     return this.received.filter((m): m is Extract<CoopMessage, { t: "turnCommand" }> => m.t === "turnCommand");

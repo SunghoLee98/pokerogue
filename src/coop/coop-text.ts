@@ -52,6 +52,7 @@ const COOP_TEXT = {
     ko: "파트너가 보상을 고르는 중입니다. 고르면 핑을 보냅니다.",
   },
   notEnoughMoney: { en: "You don't have enough money.", ko: "돈이 부족합니다." },
+  partnerPingedOption: { en: "Your partner suggests: {{option}}", ko: "파트너: {{option}} 골라줘!" },
   partnerPinged: { en: "Your partner suggests this one!", ko: "파트너: 이거 골라줘!" },
   fleeDeclined: { en: "Your partner did not agree to flee.", ko: "파트너가 도망에 동의하지 않았습니다." },
 } as const satisfies Record<string, { en: string; ko: string }>;
