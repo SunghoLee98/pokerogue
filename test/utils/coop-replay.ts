@@ -34,6 +34,7 @@ import { SelectStarterPhase } from "#phases/select-starter-phase";
 import type { GameData } from "#system/game-data";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
+import { CoopTestPartner, synthesizeMoveCommand } from "#test/utils/coop-partner";
 import { getEnumValues } from "#utils/enums";
 import { vi } from "vitest";
 
@@ -294,7 +295,12 @@ export function createTestStarterPayload(speciesId: SpeciesId): CoopStarterPaylo
 }
 
 /** Select both players' commands for the current turn, recording them. */
-function selectCommands(game: GameManager, options: CoopReplayOptions, log: CoopReplayLog): void {
+function selectCommands(
+  game: GameManager,
+  options: CoopReplayOptions,
+  log: CoopReplayLog,
+  partner: CoopTestPartner,
+): void {
   const { role, localCommand, remote } = options;
   const { waveIndex: wave, turn } = game.scene.currentBattle;
   for (const by of ["host", "guest"] as const) {
@@ -307,7 +313,12 @@ function selectCommands(game: GameManager, options: CoopReplayOptions, log: Coop
       command = remote.command(wave, turn);
     }
     log.inputs.push({ by, wave, turn, ...command });
-    game.move.select(command.moveId, FIELD_BY_ROLE[by], command.target);
+    if (by === role) {
+      game.move.select(command.moveId, FIELD_BY_ROLE[by], command.target);
+    } else {
+      // The partner's client is not running: send what it would send for its own slot.
+      partner.sendCommand(synthesizeMoveCommand(FIELD_BY_ROLE[by], command.moveId, command.target));
+    }
   }
 }
 
@@ -332,6 +343,7 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
     timedEvent: null,
   };
   const log: CoopReplayLog = { inputs: [], checksums: [], enemyIds: [], states: [] };
+  const partner = new CoopTestPartner(options.role);
   const checkpoint = () => {
     const { waveIndex, turn } = game.scene.currentBattle;
     const state = captureCoopState();
@@ -346,12 +358,12 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
   try {
     // The real co-op start: both clients sow the shared seed before creating the starters, so starter ids agree,
     // and the starters' owners are registered from the picks.
-    await startCoopBattle(game, { role: options.role, start });
+    await startCoopBattle(game, { role: options.role, start, transport: partner.localTransport });
     waveStart();
 
     let cleared = 0;
     while (cleared < options.waves) {
-      selectCommands(game, options, log);
+      selectCommands(game, options, log, partner);
       await game.toEndOfTurn();
       checkpoint();
 

@@ -3,6 +3,12 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { getPokemonNameWithAffix } from "#app/messages";
+import {
+  coopBlocksCommandCancel,
+  coopKeepsAllyCommand,
+  deferCoopRemoteCommand,
+  takeOverCoopCommandInput,
+} from "#coop/coop-turn-commands";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed-utils";
@@ -79,6 +85,9 @@ export class CommandPhase extends FieldPhase {
     if (globalScene.getPlayerField().filter(p => p.isActive()).length === 1) {
       const activeIndex = globalScene.getPlayerField().findIndex(p => p.isActive());
       this.fieldIndex = activeIndex === -1 ? FieldPosition.CENTER : activeIndex;
+      return;
+    }
+    if (coopKeepsAllyCommand()) {
       return;
     }
 
@@ -159,7 +168,9 @@ export class CommandPhase extends FieldPhase {
     }
     const moveIndex = playerPokemon.getMoveset().findIndex(m => m.moveId === queuedMove.move);
     if (!isVirtual(queuedMove.useMode) && moveIndex === -1) {
-      globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
+      if (!takeOverCoopCommandInput(this)) {
+        globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
+      }
     } else {
       this.handleCommand(Command.FIGHT, moveIndex, queuedMove.useMode, queuedMove);
     }
@@ -169,6 +180,10 @@ export class CommandPhase extends FieldPhase {
 
   public override start(): void {
     super.start();
+
+    if (deferCoopRemoteCommand(this)) {
+      return;
+    }
 
     globalScene.updateGameInfo();
     this.resetCursorIfNeeded();
@@ -184,7 +199,7 @@ export class CommandPhase extends FieldPhase {
       return;
     }
 
-    if (this.tryExecuteQueuedMove()) {
+    if (this.tryExecuteQueuedMove() || takeOverCoopCommandInput(this)) {
       return;
     }
 
@@ -452,7 +467,7 @@ export class CommandPhase extends FieldPhase {
         cursor,
       };
       globalScene.currentBattle.turnCommands[this.fieldIndex]!.targets = targets;
-      if (this.fieldIndex) {
+      if (this.fieldIndex && !coopKeepsAllyCommand()) {
         globalScene.currentBattle.turnCommands[this.fieldIndex - 1]!.skip = true;
       }
       return true;
@@ -554,7 +569,7 @@ export class CommandPhase extends FieldPhase {
         : {
             command: Command.RUN,
           };
-      if (!this.isSwitch && this.fieldIndex) {
+      if (!this.isSwitch && this.fieldIndex && !coopKeepsAllyCommand()) {
         currentBattle.turnCommands[this.fieldIndex - 1]!.skip = true;
       }
       return true;
@@ -669,7 +684,7 @@ export class CommandPhase extends FieldPhase {
   }
 
   cancel() {
-    if (this.fieldIndex) {
+    if (this.fieldIndex && !coopBlocksCommandCancel()) {
       globalScene.phaseManager.unshiftNew("CommandPhase", 0);
       globalScene.phaseManager.unshiftNew("CommandPhase", 1);
       this.end();

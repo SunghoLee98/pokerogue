@@ -33,6 +33,16 @@ const COOP_TEXT = {
   partnerReady: { en: "Partner: ready", ko: "파트너: 준비 완료" },
   waitingForReady: { en: "Ready! Cancel to pick again", ko: "준비 완료! 취소로 다시 고르기" },
   partnerLeft: { en: "Your partner left.", ko: "파트너가 나갔습니다." },
+  waitingForCommand: { en: "Waiting for your partner's command...", ko: "파트너의 입력을 기다리는 중..." },
+  waitingForFleeAnswer: {
+    en: "Waiting for your partner to agree to flee...",
+    ko: "파트너가 도망에 동의하기를 기다리는 중...",
+  },
+  fleeProposal: {
+    en: "Your partner wants to flee.\nFlee together?",
+    ko: "파트너가 도망치려 합니다.\n같이 도망칠까요?",
+  },
+  fleeDeclined: { en: "Your partner did not agree to flee.", ko: "파트너가 도망에 동의하지 않았습니다." },
 } as const satisfies Record<string, { en: string; ko: string }>;
 
 export type CoopTextKey = keyof typeof COOP_TEXT;
