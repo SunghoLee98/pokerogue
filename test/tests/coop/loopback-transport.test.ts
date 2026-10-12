@@ -62,9 +62,22 @@ describe("LoopbackTransport", () => {
     expect(received).toEqual([hello("early")]);
   });
 
+  it("buffers again while no handler is subscribed", async () => {
+    const { host, guest } = await connectedPair();
+    const unsubscribe = guest.onMessage(() => {});
+    unsubscribe();
+    host.send({ t: "bye" });
+    await flush();
+
+    const received: CoopMessage[] = [];
+    guest.onMessage(m => received.push(m));
+    expect(received).toEqual([{ t: "bye" }]);
+  });
+
   it("stops delivering to an unsubscribed handler", async () => {
     const { host, guest } = await connectedPair();
     const received: CoopMessage[] = [];
+    guest.onMessage(() => {});
     const unsubscribe = guest.onMessage(m => received.push(m));
     unsubscribe();
     host.send({ t: "bye" });
@@ -78,8 +91,32 @@ describe("LoopbackTransport", () => {
     guest.onStatusChange(s => guestStatuses.push(s));
 
     host.close();
+    await flush();
     expect(guestStatuses).toEqual(["closed"]);
     expect(() => host.send({ t: "bye" })).not.toThrow();
+  });
+
+  it("delivers messages sent before close ahead of the close notice", async () => {
+    const { host, guest } = await connectedPair();
+    const events: string[] = [];
+    guest.onMessage(m => events.push(m.t));
+    guest.onStatusChange(s => events.push(s));
+
+    host.send({ t: "bye" });
+    host.close();
+    await flush();
+    expect(events).toEqual(["bye", "closed"]);
+  });
+
+  it("still delivers a closed peer's last messages to the open side", async () => {
+    const { host, guest } = await connectedPair();
+    const received: CoopMessage[] = [];
+    host.onMessage(m => received.push(m));
+
+    guest.send({ t: "bye" });
+    guest.close();
+    await flush();
+    expect(received).toEqual([{ t: "bye" }]);
   });
 
   it("join rejects an unknown code", async () => {

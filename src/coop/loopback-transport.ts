@@ -60,7 +60,8 @@ class LoopbackTransport implements CoopTransport {
       return;
     }
     this.listeners.setStatus("closed");
-    this.peer.close();
+    // Queued behind messages already sent, so the peer sees them before the close, as over a real connection.
+    queueMicrotask(() => this.peer.listeners.setStatus("closed"));
   }
 
   private get isClosed(): boolean {

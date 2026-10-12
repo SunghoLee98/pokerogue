@@ -14,7 +14,7 @@ export type CoopConnectionStatus = "connecting" | "waitingForPeer" | "connected"
  * A two-party connection.
  *
  * Every implementation must:
- * - Buffer messages that arrive before the first `onMessage` handler subscribes, and deliver them in order on subscribe.
+ * - Buffer messages that arrive while no `onMessage` handler is subscribed, and deliver them in order to the next one.
  * - Silently ignore `send` after `close()`.
  */
 export interface CoopTransport {
@@ -30,12 +30,12 @@ export interface CoopTransport {
 
 /**
  * Handler bookkeeping shared by transport implementations,
- * including the buffering of messages that arrive before anyone listens.
+ * including the buffering of messages that arrive while nobody listens.
  */
 export class CoopTransportListeners {
   private readonly messageHandlers = new Set<(message: CoopMessage) => void>();
   private readonly statusHandlers = new Set<(status: CoopConnectionStatus) => void>();
-  private pending: CoopMessage[] | null = [];
+  private pending: CoopMessage[] = [];
   private currentStatus: CoopConnectionStatus = "connecting";
 
   get status(): CoopConnectionStatus {
@@ -44,12 +44,10 @@ export class CoopTransportListeners {
 
   onMessage(handler: (message: CoopMessage) => void): Unsubscribe {
     this.messageHandlers.add(handler);
-    if (this.pending) {
-      const buffered = this.pending;
-      this.pending = null;
-      for (const message of buffered) {
-        handler(message);
-      }
+    const buffered = this.pending;
+    this.pending = [];
+    for (const message of buffered) {
+      handler(message);
     }
     return () => this.messageHandlers.delete(handler);
   }
@@ -60,7 +58,7 @@ export class CoopTransportListeners {
   }
 
   emitMessage(message: CoopMessage): void {
-    if (this.pending) {
+    if (this.messageHandlers.size === 0) {
       this.pending.push(message);
       return;
     }
