@@ -266,10 +266,12 @@ export function submitCoopRewardChoice(phase: SelectModifierPhase, target?: Coop
   const action = { ...screen.pending, ...target };
   screen.pending = null;
   if (target) {
-    // Back from the party screen to the reward screen, as the solo flow does before applying.
-    globalScene.ui.setMode(UiMode.MODIFIER_SELECT, phase.isPlayer());
+    // Back from the party screen to the reward screen first, as the solo flow does before applying: applying may
+    // close the screen, which must not race the transition back.
+    globalScene.ui.setMode(UiMode.MODIFIER_SELECT, phase.isPlayer()).then(() => submit(session, screen, action));
+  } else {
+    submit(session, screen, action);
   }
-  submit(session, screen, action);
   return true;
 }
 

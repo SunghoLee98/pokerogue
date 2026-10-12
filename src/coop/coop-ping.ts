@@ -70,7 +70,7 @@ function markRewardPing({ row, cursor }: PingPayload): void {
       .filter(o => o.name === MARKER_NAME)
       .forEach(o => o.destroy());
   }
-  const marker = addTextObject(0, -26, "!", TextStyle.MONEY, { align: "center" }).setOrigin(0.5, 0);
+  const marker = addTextObject(0, -34, "!", TextStyle.MONEY, { align: "center", fontSize: "96px" }).setOrigin(0.5, 0);
   marker.setName(MARKER_NAME);
   option.add(marker);
   showCoopBanner(coopText("partnerPinged"));

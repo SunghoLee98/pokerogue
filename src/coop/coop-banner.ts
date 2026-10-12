@@ -13,7 +13,8 @@ let shown: string | null = null;
 /** Show `text` at the top of the screen, replacing what the banner showed before. */
 export function showCoopBanner(text: string): void {
   if (banner?.scene !== globalScene) {
-    banner = addTextObject(4, -globalScene.scaledCanvas.height + 2, "", TextStyle.MESSAGE);
+    // Small, in the top left corner: clear of the shop row and the wave and money at the top right.
+    banner = addTextObject(3, -globalScene.scaledCanvas.height + 2, "", TextStyle.PARTY);
     banner.setName("coop-banner");
     globalScene.ui.add(banner);
   }

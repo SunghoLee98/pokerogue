@@ -15,7 +15,7 @@ import { createTestStarterPayload, startCoopBattle } from "#test/utils/coop-repl
 import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import { PartyOption, type PartyUiHandler } from "#ui/party-ui-handler";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const snapshot = (trainerId: number): CoopAccountSnapshot => ({
   trainerId,
@@ -168,6 +168,34 @@ describe("co-op reward turns", () => {
     expect(rewardEvents(partner).map(m => m.action)).toEqual([
       { kind: "reward", option: 1, slot: 1, partyOption: PartyOption.APPLY },
     ]);
+  });
+
+  it("waits until the reward screen is back before applying a reward picked for a pokemon", async () => {
+    const partner = await toRewardScreen("host", 3);
+    choose(1, 1);
+    await waitForCoop(() => game.scene.ui.mode === UiMode.PARTY);
+    // Leaving the party screen takes a transition: hold it.
+    let finishTransition = () => {};
+    const setMode = game.scene.ui.setMode.bind(game.scene.ui);
+    vi.spyOn(game.scene.ui, "setMode").mockImplementation((mode, ...args) => {
+      if (mode !== UiMode.MODIFIER_SELECT) {
+        return setMode(mode, ...args);
+      }
+      return new Promise<void>(resolve => {
+        finishTransition = () => setMode(mode, ...args).then(resolve);
+      });
+    });
+    const party = game.scene.ui.getHandler() as PartyUiHandler;
+    party.setCursor(1);
+    party.processInput(Button.ACTION);
+    party.processInput(Button.ACTION);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(rewardEvents(partner)).toEqual([]);
+    finishTransition();
+    await waitForCoop(() => rewardEvents(partner).length > 0);
+    await nextWave();
+    expect(game.scene.findModifiers(m => m instanceof TurnHealModifier)).toHaveLength(1);
   });
 
   it("rerolls only for the picker, once", async () => {

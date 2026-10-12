@@ -48,8 +48,8 @@ const COOP_TEXT = {
     ko: "{{pokemonName}}은(는) 파트너의 포켓몬입니다.",
   },
   partnerPickingReward: {
-    en: "Your partner picks the reward. Choose one to ping it.",
-    ko: "파트너가 보상을 고르는 중입니다. 고르면 핑을 보냅니다.",
+    en: "Your partner picks the reward.\nChoose one to ping it.",
+    ko: "파트너가 보상을 고르는 중\n고르면 핑을 보냅니다",
   },
   notEnoughMoney: { en: "You don't have enough money.", ko: "돈이 부족합니다." },
   partnerPingedOption: { en: "Your partner suggests: {{option}}", ko: "파트너: {{option}} 골라줘!" },
