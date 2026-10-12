@@ -7,6 +7,8 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
+import type { CoopRole } from "#coop/coop-protocol";
+import { coopSession } from "#coop/coop-session";
 import type { Pokemon } from "#field/pokemon";
 import type { PersistentModifier } from "#modifiers/modifier";
 import Phaser from "phaser";
@@ -25,6 +27,8 @@ export interface CoopPokemonState {
   fusionSpeciesId: number;
   /** `[moveId, ppUsed]` per move slot */
   moves: [number, number][];
+  /** The co-op player who owns it; `null` outside co-op and for enemies */
+  owner: CoopRole | null;
 }
 
 export interface CoopStateSnapshot {
@@ -62,6 +66,7 @@ function capturePokemon(pokemon: Pokemon): CoopPokemonState {
     variant: pokemon.variant,
     fusionSpeciesId: pokemon.fusionSpecies?.speciesId ?? 0,
     moves: pokemon.getMoveset().map(move => [move.moveId, move.ppUsed]),
+    owner: (pokemon.isPlayer() && coopSession?.ownership.get(pokemon.id)) || null,
   };
 }
 

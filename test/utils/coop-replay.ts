@@ -117,6 +117,8 @@ export interface CoopReplayOptions {
   waves: number;
   /** Stop after this many turns even if the waves are not finished */
   turns?: number;
+  /** Runs once the battle has started, before the first input (both runs must do the same) */
+  onStart?: (game: GameManager) => void;
   /** The shared seed; both runs must use the same one. Default `"coop-replay"` */
   seed?: string;
 }
@@ -381,13 +383,33 @@ function inputTurn(game: GameManager, options: CoopReplayOptions, log: CoopRepla
   const { role, localCommand, remote } = options;
   const by: CoopRole = role === "host" ? "guest" : "host";
   const { waveIndex: wave, turn } = game.scene.currentBattle;
-  const remoteMessages =
-    "log" in remote
-      ? remote.log.inputs.filter(i => i.by === by && i.wave === wave && i.turn === turn).map(i => i.message)
-      : synthesizeMessages(by, [remote.command(wave, turn)].flat());
-  for (const message of remoteMessages) {
-    log.inputs.push({ by, wave, turn, message });
-    partner.send(message);
+  const send = (messages: CoopMessage[]) => {
+    for (const message of messages) {
+      log.inputs.push({ by, wave, turn, message });
+      partner.send(message);
+    }
+  };
+  if ("log" in remote) {
+    send(remote.log.inputs.filter(i => i.by === by && i.wave === wave && i.turn === turn).map(i => i.message));
+  } else {
+    // An answer to a flee proposal (and whatever follows it) only makes sense once the proposal was made.
+    const actions = [remote.command(wave, turn)].flat();
+    const answer = actions.findIndex(a => a.kind === "fleeAnswer");
+    send(synthesizeMessages(by, answer === -1 ? actions : actions.slice(0, answer)));
+    if (answer !== -1) {
+      const deferred = synthesizeMessages(by, actions.slice(answer));
+      const off = partner.onReceive(message => {
+        if (
+          message.t === "turnCommand"
+          && message.wave === wave
+          && message.turn === turn
+          && message.command.turnCommand.command === Command.RUN
+        ) {
+          off();
+          send(deferred);
+        }
+      });
+    }
   }
   queueLocalActions(game, role, [localCommand(wave, turn)].flat());
 }
@@ -446,6 +468,7 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
     // The real co-op start: both clients sow the shared seed before creating the starters, so starter ids agree,
     // and the starters' owners are registered from the picks.
     await startCoopBattle(game, { role: options.role, start, transport: partner.localTransport });
+    options.onStart?.(game);
     waveStart();
 
     let finished = 0;

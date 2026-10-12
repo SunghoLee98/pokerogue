@@ -75,13 +75,25 @@ export class CoopTestPartner {
   /** Everything the local client sent */
   readonly received: CoopMessage[] = [];
   private readonly transport: CoopTransport;
+  private readonly listeners = new Set<(message: CoopMessage) => void>();
 
   /** @param localRole - The role of the client under test; the partner plays the other one */
   constructor(localRole: CoopRole) {
     const pair = createLoopbackPair();
     this.localTransport = pair[localRole];
     this.transport = pair[localRole === "host" ? "guest" : "host"];
-    this.transport.onMessage(message => this.received.push(message));
+    this.transport.onMessage(message => {
+      this.received.push(message);
+      for (const listener of [...this.listeners]) {
+        listener(message);
+      }
+    });
+  }
+
+  /** Be told about each message the local client sends. */
+  onReceive(listener: (message: CoopMessage) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   send(message: CoopMessage): void {

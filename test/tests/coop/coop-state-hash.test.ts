@@ -1,3 +1,4 @@
+import { CoopSession, setCoopSession } from "#coop/coop-session";
 import {
   type CoopPokemonState,
   type CoopStateSnapshot,
@@ -5,6 +6,7 @@ import {
   computeCoopStateHash,
   hashCoopState,
 } from "#coop/coop-state-hash";
+import { createLoopbackPair } from "#coop/loopback-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -24,6 +26,7 @@ function pokemonState(id: number): CoopPokemonState {
     variant: 0,
     fusionSpeciesId: 0,
     moves: [[MoveId.TACKLE, 0]],
+    owner: null,
   };
 }
 
@@ -108,6 +111,25 @@ describe("coop-state-hash", () => {
       expect(captured.enemyField).toHaveLength(2);
       expect(captured.money).toBe(game.scene.money);
       expect(captured.rngState).toBe(Phaser.Math.RND.state());
+    });
+
+    it("records who owns each party pokemon in co-op", async () => {
+      await game.classicMode.startBattle(SpeciesId.BULBASAUR, SpeciesId.CHARMANDER);
+      const [bulbasaur, charmander] = game.scene.getPlayerParty();
+      expect(captureCoopState().playerParty.map(p => p.owner)).toEqual([null, null]);
+
+      const session = new CoopSession("host", createLoopbackPair().host);
+      session.ownership.set(bulbasaur.id, "host");
+      session.ownership.set(charmander.id, "guest");
+      setCoopSession(session);
+      try {
+        const before = computeCoopStateHash();
+        expect(captureCoopState().playerParty.map(p => p.owner)).toEqual(["host", "guest"]);
+        session.ownership.set(charmander.id, "host");
+        expect(computeCoopStateHash()).not.toBe(before);
+      } finally {
+        setCoopSession(null);
+      }
     });
 
     it("is stable when nothing happens", async () => {
