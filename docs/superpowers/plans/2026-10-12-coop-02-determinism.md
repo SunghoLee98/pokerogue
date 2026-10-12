@@ -117,19 +117,19 @@ test/utils/
   - `export function coopRandInt(range: number, min = 0): number` — `coopSession`이 없으면 `randInt(range, min)`, 있으면 `randSeedInt(range, min)`.
   - `export function coopRandIntRange(min: number, max: number): number` — 없으면 `randIntRange`, 있으면 `randSeedIntRange`.
 
-- [ ] **Step 1: 접근자 실패 테스트** (`coop-random.test.ts`):
+- [x] **Step 1: 접근자 실패 테스트** (`coop-random.test.ts`):
   - `matches randInt outside co-op`: `Math.random`을 `0.75`로 고정하면 `coopRandInt(4) === 3`, `coopRandIntRange(1, 6) === 5`이고 `Phaser.Math.RND.state()`가 바뀌지 않는다.
   - `uses the seeded RNG in co-op`: 세션을 두고 `Phaser.Math.RND.sow(["coop"])` 후 뽑은 값 열이, 같은 시드로 다시 `sow`한 뒤 `randSeedInt`로 뽑은 열과 같다. `Math.random`은 호출되지 않는다.
-- [ ] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-random.test.ts` / Expected: FAIL, 모듈 없음
-- [ ] **Step 3: `coop-random.ts` 구현** → 통과 확인
-- [ ] **Step 4: 호출 지점 실패 테스트** (`coop-random-call-sites.test.ts`, `#utils/common` 네임스페이스에 `vi.spyOn`):
+- [x] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-random.test.ts` / Expected: FAIL, 모듈 없음
+- [x] **Step 3: `coop-random.ts` 구현** → 통과 확인
+- [x] **Step 4: 호출 지점 실패 테스트** (`coop-random-call-sites.test.ts`, `#utils/common` 네임스페이스에 `vi.spyOn`):
   - `status effects stay unseeded in solo`: 세션 없이 `getRandomStatus(a, b)` 호출 시 `randIntRange`가 불린다.
   - `status effects use the seeded RNG in co-op`: 세션이 있으면 `randSeedIntRange`가 불리고 `randIntRange`는 안 불린다. `getRandomStatusEffect`, `generateRandomStatusEffect`도 같다.
   - `evil team grunt variants use the seeded RNG in co-op` (GameManager): `getRandomTrainerFunc([TrainerType.ROCKET_GRUNT], true)()` 호출 시 세션이 있으면 `randInt`가 불리지 않는다. 세션이 없으면 `randInt(2)`, `randInt(3)`이 불린다.
   - `GTS wonder trade picks the ball with the seeded RNG in co-op` (GameManager, 기존 GTS 테스트 구성): `randInt`를 `3`, `randSeedInt`를 `1`로 고정하고 옵션 2를 끝까지 진행하면 세션이 있을 때 받은 포켓몬 `pokeball === 1`, 세션이 없을 때 `3`.
-- [ ] **Step 5: 실패 확인** — 세션이 있어도 `randInt`가 불려 FAIL
-- [ ] **Step 6: 코어 7곳을 `coopRandInt`/`coopRandIntRange`로 교체**(import 한 줄 + 호출 교체만) → 통과 확인, 기존 `test/tests/mystery-encounter/encounters/global-trade-system-encounter.test.ts`도 통과
-- [ ] **Step 7: 커밋** — `feat(coop): seed result-affecting randomness in co-op`
+- [x] **Step 5: 실패 확인** — 세션이 있어도 `randInt`가 불려 FAIL
+- [x] **Step 6: 코어 7곳을 `coopRandInt`/`coopRandIntRange`로 교체**(import 한 줄 + 호출 교체만) → 통과 확인, 기존 `test/tests/mystery-encounter/encounters/global-trade-system-encounter.test.ts`도 통과
+- [x] **Step 7: 커밋** — `feat(coop): seed result-affecting randomness in co-op`
 
 ---
 
@@ -163,14 +163,14 @@ test/utils/
   - `export function getWorldSimData(gameData: SimGameDataSource = globalScene.gameData): SimAccountData` — 솔로: `gameData`를 그대로 감싼 어댑터(`!!dexData[s].caughtAttr`, `getSpeciesCount(d => !!d.caughtAttr)`, `starterData[s].eggMoves`, `isUnlocked(u)`). 협동: 호스트 스냅샷.
   - `export function getPokemonSimData(pokemonId: number, gameData = globalScene.gameData): SimAccountData` — 솔로: 위와 같음. 협동: `ownership.get(pokemonId)`의 스냅샷, 소유자가 없으면(적, 인카운터 포켓몬) 호스트 스냅샷.
 
-- [ ] **Step 1: 실패 테스트** — 가짜 `SimGameDataSource`로:
+- [x] **Step 1: 실패 테스트** — 가짜 `SimGameDataSource`로:
   - `wraps the local game data outside co-op`: trainerId/secretId, `isSpeciesCaught`, `getCaughtSpeciesCount`, `getEggMoveBits`, `isUnlocked`가 가짜 데이터와 같은 값.
   - `snapshots the account`: `createAccountSnapshot`이 잡은 종, 0이 아닌 알 기술, 해금 목록을 담고 `JSON.parse(JSON.stringify(s))`와 같다.
   - `reads world data from the host snapshot in co-op`: 게스트 세션에서 로컬 가짜 데이터와 다른 호스트 스냅샷을 넣으면 `getWorldSimData()`가 호스트 값을 낸다.
   - `reads pokemon data from the owner snapshot in co-op`: id 1 호스트, id 2 게스트 소유일 때 `getPokemonSimData(2).getEggMoveBits(s)`는 게스트 값, 소유자 없는 id 99는 호스트 값.
   - `throws when a snapshot is missing`: 세션만 있고 스냅샷이 없으면 `getWorldSimData()`가 `missing co-op account snapshot for host`로 throw.
-- [ ] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인** (`pnpm test test/tests/coop`)
-- [ ] **Step 5: 커밋** — `feat(coop): add simulation data source`
+- [x] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인** (`pnpm test test/tests/coop`)
+- [x] **Step 5: 커밋** — `feat(coop): add simulation data source`
 
 ---
 
@@ -182,17 +182,17 @@ test/utils/
 
 **Interfaces:** Consumes Task 2의 `getWorldSimData`, `getPokemonSimData`, `CoopSession.setAccountSnapshot`
 
-- [ ] **Step 1: 실패 테스트** — 각 테스트는 로컬 `gameData`와 세션 스냅샷이 다른 답을 내도록 꾸민다:
+- [x] **Step 1: 실패 테스트** — 각 테스트는 로컬 `gameData`와 세션 스냅샷이 다른 답을 내도록 꾸민다:
   - `rolls enemy shininess with the host trainer id`: 적 포켓몬 id에서 `F`를 구해 호스트 스냅샷을 `trainerId = F, secretId = 0`(이로치), 로컬을 `trainerId = F ^ 0x8000`(이로치 아님)으로 두면 세션이 있을 때 `trySetShiny() === true`, 없을 때 `false`.
   - `uses the owner's egg moves`: 게스트 소유 플레이어 포켓몬의 `getLearnableLevelMoves()`가 게스트 스냅샷의 알 기술을 담고 로컬 `starterData`의 알 기술은 담지 않는다.
   - `checks species-caught evolutions against the owner's dex`: 깨비물거미(`KARRABLAST`)의 `SPECIES_CAUGHT` 조건이 소유자 스냅샷 기준으로 판정된다.
   - `checks species-dependent form changes against the owner's dex`: `getSpeciesDependentFormChangeCondition(SpeciesId.RESHIRAM)`의 조건이 소유자 스냅샷 기준.
   - `uses the host dex count for critical captures`: 호스트 스냅샷의 잡은 종 수가 801이고 로컬이 0이면 `getCriticalCaptureChance(255)`가 세션 유무에 따라 다르다(세션 있으면 2.5배 쪽).
   - `uses host unlocks for the master reward pool`: `MINI_BLACK_HOLE` 가중치 함수가 호스트 스냅샷 해금 기준으로 `1`, 세션 없으면 로컬 기준 `0`.
-- [ ] **Step 2: 실패 확인** — 세션이 있어도 로컬 값이 쓰여 FAIL
-- [ ] **Step 3: 교체** — 각 지점에서 `globalScene.gameData.X`를 접근자 호출 한 줄로 바꾼다. 예: `const E = getWorldSimData().trainerId ^ getWorldSimData().secretId;` 대신 `const { trainerId, secretId } = getWorldSimData();` 한 줄 + 기존 식 유지.
-- [ ] **Step 4: 통과 확인** — 새 테스트와 관련 기존 테스트(`test/tests/evolutions`, `test/tests/items/eviolite.test.ts`, `test/tests/moves/fusion-flare-bolt.test.ts` 등 교체 지점을 지나는 것) 통과
-- [ ] **Step 5: 커밋** — `feat(coop): read simulation account data through the data source`
+- [x] **Step 2: 실패 확인** — 세션이 있어도 로컬 값이 쓰여 FAIL
+- [x] **Step 3: 교체** — 각 지점에서 `globalScene.gameData.X`를 접근자 호출 한 줄로 바꾼다. 예: `const E = getWorldSimData().trainerId ^ getWorldSimData().secretId;` 대신 `const { trainerId, secretId } = getWorldSimData();` 한 줄 + 기존 식 유지.
+- [x] **Step 4: 통과 확인** — 새 테스트와 관련 기존 테스트(`test/tests/evolutions`, `test/tests/items/eviolite.test.ts`, `test/tests/moves/fusion-flare-bolt.test.ts` 등 교체 지점을 지나는 것) 통과
+- [x] **Step 5: 커밋** — `feat(coop): read simulation account data through the data source`
 
 ---
 
@@ -214,12 +214,12 @@ test/utils/
   - `export interface CoopDesync { index: number; expected: CoopChecksum | undefined; actual: CoopChecksum | undefined }`
   - `export function findFirstDesync(expected: readonly CoopChecksum[], actual: readonly CoopChecksum[]): CoopDesync | null` — 같은 위치의 wave·turn·hash가 하나라도 다르거나 길이가 다르면 첫 위치를 돌려준다.
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
   - `coop-desync.test.ts`: `returns null for identical sequences`, `reports the first differing checkpoint`, `reports a missing checkpoint when lengths differ`.
   - `coop-state-hash.test.ts` (순수): `hashes equal states equally`(키 순서가 다른 같은 객체도 같은 해시), `changes when hp, status, shininess or rng state changes`, `is a 16 character hex string`.
   - `coop-state-hash.test.ts` (GameManager, 더블 배틀 시작 후): `captures both fields and parties`(필드 id 2개씩, 파티 길이), `changes after a turn that deals damage`(턴 전후 해시가 다름), `is stable when nothing happens`(연속 두 번 계산이 같음).
-- [ ] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
-- [ ] **Step 5: 커밋** — `feat(coop): add state hash and checksum comparison`
+- [x] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
+- [x] **Step 5: 커밋** — `feat(coop): add state hash and checksum comparison`
 
 ---
 
@@ -241,19 +241,38 @@ test/utils/
     - 매 턴 끝(`TurnEndPhase` 이후)과 매 웨이브 시작(새 웨이브 첫 `CommandPhase`)에 `computeCoopStateHash()`를 기록한다.
 - 시나리오 공통: 더블 배틀, 플레이어 레벨 100, 적 기술 `SPLASH`, 트레이너 웨이브 끔, 이로치 정규화 끔(`trySetShiny`가 실제로 trainerId를 쓰도록), 웨이브 2개.
 
-- [ ] **Step 1: 실패 테스트** (`coop-desync-replay.test.ts`):
+- [x] **Step 1: 실패 테스트** (`coop-desync-replay.test.ts`):
   - `host run is reproducible`: 같은 입력으로 호스트 실행을 두 번 하면 체크섬 열이 같고 길이가 3 이상이며 웨이브 2개를 지난다.
   - `guest replay with different account data matches the host hashes`: 게스트 계정은 trainerId/secretId가 첫 적을 이로치로 만드는 값(호스트 기록의 첫 적 id로 계산), `EVIOLITE`·`MINI_BLACK_HOLE` 해금, 다른 알 기술. 게스트 실행의 체크섬 열이 호스트 기록과 같다(`findFirstDesync === null`).
   - `detects a divergence injected through wrong world data`: 같은 게스트 실행에서 `worldData`로 게스트 자신의 스냅샷을 넣으면(세계 데이터 읽기가 로컬 계정으로 샌 상황) `findFirstDesync`가 첫 체크포인트(웨이브 1)를 가리킨다.
   - `move animation setting does not change the hashes`: 게스트 실행에서 `enableMoveAnimations`를 반대로 둬도 체크섬 열이 같다.
-- [ ] **Step 2: 실패 확인** — `test/utils/coop-replay.ts` 없음
-- [ ] **Step 3: 도구 구현** → **Step 4: 통과 확인**
-- [ ] **Step 5: 커밋** — `test(coop): add record-replay desync harness`
+- [x] **Step 2: 실패 확인** — `test/utils/coop-replay.ts` 없음
+- [x] **Step 3: 도구 구현** → **Step 4: 통과 확인**
+- [x] **Step 5: 커밋** — `test(coop): add record-replay desync harness`
 
 ---
 
 ### Task 6: 마무리 확인
 
-- [ ] **Step 1:** Run: `pnpm test test/tests/coop && pnpm typecheck && pnpm biome:ci && pnpm exec ls-lint && pnpm coop:server:test` / Expected: 통과(`pokemon-sprite.test.ts`의 기존 assets 관련 타입 오류 제외)
-- [ ] **Step 2:** 교체 지점을 지나는 기존 테스트 묶음 실행(진화, 폼 변경, 볼, 보상, GTS, 상태이상) / Expected: 변경 전과 같은 결과
-- [ ] **Step 3:** 이 문서에 "구현 메모" 추가, 체크박스 갱신, 커밋 — `docs: mark co-op determinism plan progress`
+- [x] **Step 1:** Run: `pnpm test test/tests/coop && pnpm typecheck && pnpm biome:ci && pnpm exec ls-lint && pnpm coop:server:test` / Expected: 통과(`pokemon-sprite.test.ts`의 기존 assets 관련 타입 오류 제외)
+- [x] **Step 2:** 교체 지점을 지나는 기존 테스트 묶음 실행(진화, 폼 변경, 볼, 보상, GTS, 상태이상) / Expected: 변경 전과 같은 결과
+- [x] **Step 3:** 이 문서에 "구현 메모" 추가, 체크박스 갱신, 커밋 — `docs: mark co-op determinism plan progress`
+
+---
+
+## 구현 메모 (계획과 달라진 점)
+
+구현하면서 계획과 다르게 정하거나 새로 알게 된 부분이다. 3단계 이후 계획은 이 내용을 기준으로 작성한다.
+
+1. **스타터 id는 생성 시점의 RNG 상태에 달려 있다 (3단계 영향)**: `PlayerPokemon`의 `id`는 생성자에서 `randSeedInt`로 뽑힌다. 테스트의 `generateStarters`는 `scene.seed`만 바꾸고 RNG를 다시 심지 않아서, 같은 프로세스에서 두 번 돌리면 스타터 id가 달랐다(호스트 실행도 재현되지 않았다). id는 이로치 판정(`F`), 소유권 표, 해시에 모두 들어가므로, 3단계에서 협동 게임을 시작할 때 두 클라이언트가 `start`의 공유 시드를 먼저 심은 뒤 같은 순서(호스트 3마리 → 게스트 3마리)로 스타터를 만들어야 한다. 기록-재생 도구는 `game.override.seed(seed)`로 이를 흉내 낸다(`CoopReplayOptions.seed`, 기본 `"coop-replay"`).
+2. **테스트당 `GameManager` 하나 제약**: `PromptHandler`가 테스트마다 인터벌 하나와 `ui.setModeInternal` 스파이 하나를 전제로 한다. 한 테스트 안에서 두 번 실행하려고 `createFreshGameManager(phaserGame)`(`test/utils/coop-replay.ts`)를 두었다. `vi.restoreAllMocks()`로 앞 실행의 스파이를 풀고 인터벌을 지운 뒤 새로 만든다.
+3. **기록-재생 도구 인터페이스**: 계획의 `accounts: Record<CoopRole, CoopAccountSnapshot>` 대신, 기본 테스트 계정과의 차이만 적는 `CoopTestAccount`(trainerId, secretId, unlocks, 추가로 잡은 종, 알 기술 비트)를 받는다. 기본 계정 스냅샷에 차이를 합쳐 두 역할의 스냅샷을 만들고, 로컬 `gameData`에 적용한 뒤 `createAccountSnapshot(gameData)`가 그 역할의 스냅샷과 같은지 확인한다(다르면 throw). 잘못된 세계 데이터 주입 옵션 이름은 `worldDataOverride`다. 로그에는 체크섬 외에 웨이브 시작 시 적 id(`enemyIds`, 시나리오 계정 계산용)와 해시한 상태 원본(`states`, desync 원인 확인용)을 담는다. 상대 명령은 `remote: { command }`(기록 실행) 또는 `remote: { log }`(재생 실행)로 받는다.
+4. **시나리오가 실제로 우회를 잡는지 확인**: `trySetShiny`의 접근자 교체를 임시로 되돌리면 `guest replay with different account data matches the host hashes`와 `move animation setting does not change the hashes`가 실패하는 것을 확인했다(웨이브 1 시작 체크포인트에서 첫 적의 이로치 여부와 변종 롤로 RNG 상태가 갈림).
+5. **해시 세부**: `BattleScene.enemyModifiers`가 private이라 `findModifiers(() => true, false)`로 읽는다. `Battle.battleSeedState`도 private이라 원소 접근(`battle["battleSeedState"]`)으로 읽는다. 해시는 32비트 FNV-1a 한 갈래와 다른 곱수·xorshift를 쓰는 두 번째 갈래를 이어 붙인 16자리 16진수다(계획의 "64비트 FNV-1a"를 BigInt 없이 근사). 보유 아이템은 `[타입 id, 개수, 지닌 포켓몬 id 또는 -1]`로 넣는다.
+6. **`coopRandInt`의 솔로 호출 형태**: 솔로에서 `randInt(n)` 대신 `randInt(n, 0)`이 불린다. 기본값과 같은 인자라 결과는 같다. 호출 지점 테스트는 `(n, 0)`으로 확인한다.
+7. **`init-modifier-pools.ts` 서식**: Eviolite 조건 한 줄 교체가 biome 줄 길이 규칙 때문에 여러 줄로 다시 포매팅되었다(논리 변경은 접근자 교체뿐).
+8. **해시에 안 들어가는 것**: 보상 화면에 제시된 선택지 목록은 해시에 없다. 보상 풀 가중치가 달라도 RNG 소비 횟수가 같으면 해시로는 드러나지 않을 수 있다. 5단계(보상 순번)에서 체크포인트에 제시된 선택지 id를 더하는 것을 검토한다.
+9. **체크포인트 위치**: 이번 단계는 테스트 도구가 턴 끝·웨이브 시작에 해시를 계산한다. 실제 게임에서 `checksum` 메시지를 보내는 훅은 6단계(desync 감지)에서 페이즈에 단다.
+10. **로컬 테스트 환경**: 작업 환경에 `assets` 서브모듈이 없어 처음에는 GameManager 테스트가 전부 실패했다. `pokerogue-assets`의 해당 커밋에서 JSON 파일만(루트 JSON, `battle-anims/`, 변종 마스터리스트, 933개) 희소 체크아웃해 `assets/`에 두니 GameManager 테스트가 로컬에서 돌았다(이미지가 필요한 `test/tests/pokemon/pokemon-sprite.test.ts` 8개만 실패). 저장소에는 커밋하지 않았다.
+11. **세션에는 스냅샷이 반드시 있어야 한다**: Task 3 이후 협동 세션이 있으면 적 생성(`trySetShiny`)부터 호스트 스냅샷을 읽는다. Task 1의 호출 지점 테스트가 스냅샷 없는 세션을 만들어 GTS 테스트가 `missing co-op account snapshot for host`로 멈췄고, 테스트 세션에 빈 스냅샷을 넣어 고쳤다. 3단계에서 세션을 시작하는 경로는 `setCoopSession` 전에 두 스냅샷을 모두 넣어야 한다.
+12. **회귀 확인 (로컬)**: 전체 `pnpm test:silent`를 위 10번의 JSON 전용 assets로 돌렸다. 11번 수정 전 결과는 테스트 파일 463개 통과·2개 실패·8개 건너뜀, 테스트 3166개 통과·9개 실패였고, 실패는 `pokemon-sprite.test.ts` 8개(이미지 없음, 환경 문제)와 11번의 테스트 1개였다. 11번 수정 후 `test/tests/coop` 12개 파일 74개 테스트가 모두 통과했다. 최종 확인은 GitHub Actions `Tests` 워크플로우로 한다.
