@@ -1,6 +1,7 @@
 import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
 import { setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
+import { coopText } from "#coop/coop-text";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { MoveId } from "#enums/move-id";
@@ -67,6 +68,18 @@ describe("co-op turn commands", () => {
   }
 
   it("lets the host command only field slot 0 and waits for the partner", async () => {
+    const ui = game.scene.ui;
+    const textLog: string[] = [];
+    const showText = ui.showText.bind(ui);
+    const clearText = ui.clearText.bind(ui);
+    vi.spyOn(ui, "showText").mockImplementation((text, ...rest) => {
+      textLog.push(text);
+      return showText(text, ...rest);
+    });
+    vi.spyOn(ui, "clearText").mockImplementation(() => {
+      textLog.push("");
+      return clearText();
+    });
     const partner = await start("host");
     expect(currentCommandPhase().getFieldIndex()).toBe(0);
     expect(game.scene.ui.mode).toBe(UiMode.COMMAND);
@@ -86,6 +99,10 @@ describe("co-op turn commands", () => {
 
     partner.sendCommand(synthesizeMoveCommand(1, MoveId.SCRATCH, BattlerIndex.ENEMY));
     await turnStart;
+    // The waiting text does not linger into the turn.
+    const waitingShown = textLog.lastIndexOf(coopText("waitingForCommand"));
+    expect(waitingShown).toBeGreaterThan(-1);
+    expect(textLog.slice(waitingShown + 1)).toContain("");
 
     const { turnCommands } = game.scene.currentBattle;
     expect(turnCommands[BattlerIndex.PLAYER]?.targets).toEqual([BattlerIndex.ENEMY_2]);
