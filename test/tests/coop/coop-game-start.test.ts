@@ -1,8 +1,12 @@
 import { timedEventManager } from "#app/global-event-manager";
+import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { assembleCoopParty, beginCoopSession, COOP_SESSION_SLOT, createCoopGameMode } from "#coop/coop-game-start";
-import type { CoopAccountSnapshot, CoopStarterPayload } from "#coop/coop-protocol";
+import type { CoopAccountSnapshot, CoopRole, CoopStarterPayload } from "#coop/coop-protocol";
 import { coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
+import { computeCoopStateHash } from "#coop/coop-state-hash";
+import type { CoopTransport } from "#coop/coop-transport";
 import { createLoopbackPair } from "#coop/loopback-transport";
 import { Gender } from "#data/gender";
 import { EventType } from "#enums/event-type";
@@ -11,8 +15,16 @@ import { Nature } from "#enums/nature";
 import { PokeballType } from "#enums/pokeball";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import { Unlockables } from "#enums/unlockables";
 import { GameManager } from "#test/framework/game-manager";
-import { startCoopBattle } from "#test/utils/coop-replay";
+import {
+  applyTestAccount,
+  type CoopTestAccount,
+  createFreshGameManager,
+  selectCoopStart,
+  snapshotForTestAccount,
+  startCoopBattle,
+} from "#test/utils/coop-replay";
 import type { TimedEvent } from "#types/game-events";
 import { randSeedInt } from "#utils/common";
 import Phaser from "phaser";
@@ -159,5 +171,115 @@ describe("co-op game start", () => {
       beginCoopSession("guest", createLoopbackPair().guest, startInfo([SpeciesId.BULBASAUR], []));
       expect(timedEventManager.isActive({ ...pastEvent, endDate: new Date(Date.UTC(3000, 0, 1)) })).toBe(false);
     });
+  });
+});
+
+describe("co-op start end to end", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  const accounts: Record<CoopRole, CoopTestAccount> = {
+    host: {
+      trainerId: 1111,
+      secretId: 2222,
+      unlocks: [],
+      caughtSpecies: [],
+      eggMoves: { [SpeciesId.BULBASAUR]: 0b0001 },
+    },
+    // Differs from the host in every value the start reads, including Bulbasaur's egg moves.
+    guest: {
+      trainerId: 3333,
+      secretId: 4444,
+      unlocks: [Unlockables.EVIOLITE, Unlockables.MINI_BLACK_HOLE],
+      caughtSpecies: [SpeciesId.SHELMET, SpeciesId.RESHIRAM],
+      eggMoves: { [SpeciesId.BULBASAUR]: 0, [SpeciesId.CHARMANDER]: 0b1111 },
+    },
+  };
+
+  interface RoleRun {
+    party: [id: number, speciesId: SpeciesId, owner: CoopRole | undefined][];
+    moves: MoveId[][];
+    hash: string;
+  }
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+  });
+
+  afterEach(() => {
+    setCoopSession(null);
+  });
+
+  function setUpOverrides(): void {
+    game.override.battleStyle("double").enemyMoveset(MoveId.SPLASH).disableTrainerWaves();
+    game.override.disableShinies = false;
+    game.override.shiny(false);
+  }
+
+  /** The host's first pick knows an egg move only the host has unlocked. */
+  function hostPicks(): CoopStarterPayload[] {
+    const levelMoves = speciesDataRegistry
+      .getSpecies(SpeciesId.BULBASAUR)
+      .getLevelMoves()
+      .filter(([level]) => level <= 5)
+      .map(([, move]) => move);
+    const moveset = [levelMoves[0], speciesEggMoves[SpeciesId.BULBASAUR][0]];
+    return [{ ...testPick(SpeciesId.BULBASAUR), moveset }, testPick(SpeciesId.PIKACHU)];
+  }
+
+  async function runRole(role: CoopRole, start: CoopStartInfo, transport: CoopTransport): Promise<RoleRun> {
+    setUpOverrides();
+    applyTestAccount(game.scene.gameData, accounts[role]);
+    await startCoopBattle(game, { role, start, transport });
+    const party = game.scene.getPlayerParty();
+    const run: RoleRun = {
+      party: party.map(p => [p.id, p.species.speciesId, coopSession?.ownership.get(p.id)]),
+      moves: party.map(p => p.moveset.map(m => m.moveId)),
+      hash: computeCoopStateHash(),
+    };
+    setCoopSession(null);
+    return run;
+  }
+
+  /** Both players select over a loopback connection, then each role starts its own game from its start message. */
+  async function runBothRoles(): Promise<Record<CoopRole, RoleRun>> {
+    const { gameData } = game.scene;
+    const { starts, transports } = await selectCoopStart({
+      host: { picks: hostPicks(), account: snapshotForTestAccount(gameData, accounts.host) },
+      // Picking the same species as the partner is allowed.
+      guest: {
+        picks: [testPick(SpeciesId.CHARMANDER), testPick(SpeciesId.BULBASAUR)],
+        account: snapshotForTestAccount(gameData, accounts.guest),
+      },
+    });
+    const host = await runRole("host", starts.host, transports.host);
+    game = createFreshGameManager(phaserGame);
+    const guest = await runRole("guest", starts.guest, transports.guest);
+    return { host, guest };
+  }
+
+  it("host and guest build the same party from the start message", async () => {
+    const { host, guest } = await runBothRoles();
+
+    expect(host.party.map(([, speciesId, owner]) => [speciesId, owner])).toEqual([
+      [SpeciesId.BULBASAUR, "host"],
+      [SpeciesId.CHARMANDER, "guest"],
+      [SpeciesId.PIKACHU, "host"],
+      [SpeciesId.BULBASAUR, "guest"],
+    ]);
+    expect(guest.party).toEqual(host.party);
+    expect(guest.moves).toEqual(host.moves);
+  });
+
+  it("first wave hash matches between host and guest with different accounts", async () => {
+    const { host, guest } = await runBothRoles();
+
+    // Sanity: the host's egg move made it in, so a guest reading its own account would differ.
+    expect(host.moves[0]).toContain(speciesEggMoves[SpeciesId.BULBASAUR][0]);
+    expect(guest.hash).toBe(host.hash);
   });
 });

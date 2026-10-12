@@ -12,10 +12,10 @@ import { settings } from "#app/global-settings-manager";
 import { activeOverrides } from "#app/overrides";
 import type { CoopChecksum } from "#coop/coop-desync";
 import { createCoopGameMode, startCoopRun } from "#coop/coop-game-start";
-import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
+import type { CoopAccountSnapshot, CoopRole, CoopStarterPayload } from "#coop/coop-protocol";
 import { CoopSession, setCoopSession } from "#coop/coop-session";
 import { createAccountSnapshot } from "#coop/coop-sim-data";
-import type { CoopStartInfo } from "#coop/coop-starter-selection";
+import { CoopStarterSelection, type CoopStartInfo } from "#coop/coop-starter-selection";
 import { type CoopStateSnapshot, captureCoopState, hashCoopState } from "#coop/coop-state-hash";
 import type { CoopTransport } from "#coop/coop-transport";
 import { createLoopbackPair } from "#coop/loopback-transport";
@@ -153,6 +153,45 @@ export async function startCoopBattle(game: GameManager, options: CoopBattleStar
   await game.phaseInterceptor.to("CommandPhase");
 }
 
+export interface CoopSelectionSide {
+  picks: CoopStarterPayload[];
+  account: CoopAccountSnapshot;
+}
+
+/**
+ * Run the starter selection for both players over a loopback connection until the host starts the run.
+ * @returns Each side's start information (they must be equal) and the connected transports
+ */
+export async function selectCoopStart(
+  sides: Record<CoopRole, CoopSelectionSide>,
+  seed = "coop-select",
+): Promise<{ starts: Record<CoopRole, CoopStartInfo>; transports: Record<CoopRole, CoopTransport> }> {
+  const transports = createLoopbackPair();
+  const { joinCode } = await transports.host.host();
+  await transports.guest.join(joinCode);
+  const selections = {
+    host: new CoopStarterSelection("host", transports.host, {
+      getAccount: () => sides.host.account,
+      createSeed: () => seed,
+      getTimedEvent: () => null,
+    }),
+    guest: new CoopStarterSelection("guest", transports.guest, { getAccount: () => sides.guest.account }),
+  };
+  selections.guest.setReady(sides.guest.picks);
+  selections.host.setReady(sides.host.picks);
+  // Let the loopback deliver the guest's selection and the host's start.
+  await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+  const host = selections.host.startInfo;
+  const guest = selections.guest.startInfo;
+  selections.host.dispose();
+  selections.guest.dispose();
+  if (!host || !guest) {
+    throw new Error("the co-op starter selection did not start");
+  }
+  return { starts: { host, guest }, transports };
+}
+
 /** The field slot each role commands. */
 const FIELD_BY_ROLE = {
   host: BattlerIndex.PLAYER,
@@ -163,17 +202,31 @@ const CAUGHT_ATTR = DexAttr.NON_SHINY | DexAttr.MALE | DexAttr.DEFAULT_VARIANT |
 
 /** The snapshot an account would produce, given the snapshot of the default test game data. */
 function snapshotFor(base: CoopAccountSnapshot, account: CoopTestAccount): CoopAccountSnapshot {
+  const eggMoves: Record<number, number> = {};
+  for (const [speciesId, bits] of Object.entries({ ...base.eggMoves, ...account.eggMoves })) {
+    if (bits) {
+      eggMoves[Number(speciesId)] = bits;
+    }
+  }
   return {
     trainerId: account.trainerId,
     secretId: account.secretId,
     caughtSpecies: [...new Set([...base.caughtSpecies, ...account.caughtSpecies])].sort((a, b) => a - b),
-    eggMoves: { ...base.eggMoves, ...account.eggMoves },
+    eggMoves,
     unlocks: getEnumValues(Unlockables).filter(u => account.unlocks.includes(u)),
   };
 }
 
+/**
+ * The snapshot a test account produces.
+ * @param gameData - Game data still holding the default test data, which the account is applied on top of
+ */
+export function snapshotForTestAccount(gameData: GameData, account: CoopTestAccount): CoopAccountSnapshot {
+  return snapshotFor(createAccountSnapshot(gameData), account);
+}
+
 /** Make the local game data look like the given account. */
-function applyAccount(gameData: GameData, account: CoopTestAccount): void {
+export function applyTestAccount(gameData: GameData, account: CoopTestAccount): void {
   gameData.trainerId = account.trainerId;
   gameData.secretId = account.secretId;
   for (const unlockable of getEnumValues(Unlockables)) {
@@ -200,7 +253,7 @@ function startSession(game: GameManager, options: CoopReplayOptions): CoopSessio
   const { role, accounts } = options;
   const gameData = game.scene.gameData;
   const base = createAccountSnapshot(gameData);
-  applyAccount(gameData, accounts[role]);
+  applyTestAccount(gameData, accounts[role]);
 
   const snapshots = { host: snapshotFor(base, accounts.host), guest: snapshotFor(base, accounts.guest) };
   if (JSON.stringify(createAccountSnapshot(gameData)) !== JSON.stringify(snapshots[role])) {
