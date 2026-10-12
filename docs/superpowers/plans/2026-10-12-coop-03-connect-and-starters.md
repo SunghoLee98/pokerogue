@@ -130,16 +130,16 @@ test/utils/
   - `export function buildStarterPayload(starter: Starter, account: StarterPayloadAccount = globalScene.gameData): CoopStarterPayload` — 성별은 `malePercent === null`이면 무성, 아니면 `female`로. 테라 타입이 없으면 `species.type1`. 행운은 `account.getDexAttrLuck(account.dexData[speciesId].caughtAttr)`. 우정 `species.baseFriendship`, 볼 `POKEBALL`.
   - `export function createStarterFromPayload(payload: CoopStarterPayload, level: number, owner: CoopRole): PlayerPokemon` — 협동 세션 필수(없으면 throw). `addPlayerPokemon`으로 만들고 곧바로 `coopSession.ownership.set(id, owner)`, 기술은 `getPokemonSimData(id).getEggMoveBits(root)`로 검증 후 `tryPopulateMoveset(moveset, true)`, 나머지 필드를 페이로드로 채우고 `setVisible(false)`. 로컬 `gameData`를 읽지 않는다.
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
   - `coop-protocol.test.ts` `round-trips every message kind`에 새 `starters`, `start` 모양 추가.
   - `coop-starter-payload.test.ts`:
     - `builds a payload from a starter and the local account` (GameManager): 이로치 변종 2 암컷 이상해씨, 닉네임, 알 기술 포함 기술. 로컬 `dexData`의 `caughtAttr`에 `SHINY | VARIANT_3`이 있으면 `luck === 3`, `gender === Gender.FEMALE`, 테라 타입 없으면 `PokemonType.GRASS`, JSON 왕복과 같다.
     - `creates the pokemon from the payload only`: 게스트 세션(호스트 스냅샷에 이상해씨 알 기술 비트 1)에서 호스트 소유 페이로드로 만들면 알 기술이 기술 배치에 들어가고, 로컬 `starterData`를 지우거나(알 기술 0) `dexData` 행운 정보를 바꿔도 결과가 같다. 소유권이 등록된다.
     - `rejects an egg move the owner has not unlocked`: 소유자 스냅샷 알 기술 0이면 기술 배치가 기본(빈 배치)으로 남는다.
     - `throws outside co-op`.
-- [ ] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-starter-payload.test.ts` / Expected: FAIL, 모듈 없음
-- [ ] **Step 3: 구현** → **Step 4: 통과 확인** (`pnpm test test/tests/coop && pnpm typecheck`)
-- [ ] **Step 5: 커밋** — `feat(coop): add starter payloads`
+- [x] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-starter-payload.test.ts` / Expected: FAIL, 모듈 없음
+- [x] **Step 3: 구현** → **Step 4: 통과 확인** (`pnpm test test/tests/coop && pnpm typecheck`)
+- [x] **Step 5: 커밋** — `feat(coop): add starter payloads`
 
 ---
 
@@ -155,12 +155,12 @@ test/utils/
 - `export function applyCoopValueLimit(limit: number): number` — `globalScene.gameMode.isCoop`이면 `limit / 2`(반올림하지 않음, 한도 10 → 5), 아니면 그대로.
 - `export function getStarterPickLimit(): number` — 협동이면 `COOP_MAX_OWNED`(3), 아니면 `PLAYER_PARTY_MAX_SIZE`(6).
 
-- [ ] **Step 1: 실패 테스트** (GameManager)
+- [x] **Step 1: 실패 테스트** (GameManager)
   - `co-op is a flag on classic`: `createCoopGameMode()`는 `modeId === CLASSIC`, `isClassic`, `isCoop`; `getGameMode(CLASSIC).isCoop === false`.
   - `halves the run value limit in co-op`: 협동 게임 모드면 `getRunValueLimit() === 5`, 솔로 클래식 `10`.
   - `limits picks to three in co-op`: `getStarterPickLimit()`이 협동 3, 솔로 6.
-- [ ] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
-- [ ] **Step 5: 커밋** — `feat(coop): add co-op game mode flag and starter limits`
+- [x] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
+- [x] **Step 5: 커밋** — `feat(coop): add co-op game mode flag and starter limits`
 
 ---
 
@@ -181,15 +181,15 @@ test/utils/
   - `onChange(handler): Unsubscribe`, `onStart(handler: (info) => void): Unsubscribe`, `dispose(): void`
   - 규칙: 상대 `starters`는 `ready`일 때만 픽을 보관(아니면 빈 배열). 호스트는 자신과 상대가 모두 레디가 되는 순간 `start`를 보내고 시작한다. 게스트는 `start`를 받으면 시작한다(로컬에서 레디를 취소했더라도 호스트의 `start`가 이긴다). 시작 후 `starters`는 무시. `bye`나 연결 `closed`면 `closed = true`.
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
   - `sends picks only when ready`: 게스트가 레디하기 전 호스트의 `partner.picks`는 비어 있고, 레디 후 게스트 픽 1마리가 보인다.
   - `clears the partner picks on unready`: 게스트 레디 → 취소하면 호스트의 `partner`가 `{ picks: [], ready: false }`.
   - `starts when both are ready`: 양쪽 레디 후 두 쪽의 `startInfo`가 같고(`toEqual`), 시드는 호스트 `createSeed` 값, `accounts`는 각자 보낸 스냅샷, `timedEvent`는 호스트 값.
   - `allows cancelling ready while the partner is still picking`: 호스트 레디 → 취소 → 다시 레디(다른 픽) → 게스트 레디 후 시작 정보의 호스트 픽은 마지막 픽.
   - `the host start wins over a crossing unready`: 호스트 레디, 게스트 레디와 거의 동시에 게스트가 취소하면(메시지 전달 전 `cancelReady`) 게스트는 `start`를 받아 레디했던 픽으로 시작하고 `cancelReady()`는 이후 `false`.
   - `rejects more than three picks`, `marks the selection closed when the peer leaves`.
-- [ ] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
-- [ ] **Step 5: 커밋** — `feat(coop): add starter selection state machine`
+- [x] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
+- [x] **Step 5: 커밋** — `feat(coop): add starter selection state machine`
 
 ---
 
@@ -208,13 +208,13 @@ test/utils/
 - `coop-lobby.ts`: `export interface CoopLobby { role; transport; peerAccountName; selection }`, `export let coopLobby`, `openCoopLobby(connection)`, `leaveCoop()`(로비·세션 정리, `bye` 후 연결 종료), `startCoopRunFromLobby(initBattle)`.
 - `getCoopTimedEvent(): string | null | undefined` — 협동이 아니면 `undefined`.
 
-- [ ] **Step 1: 실패 테스트** (GameManager)
+- [x] **Step 1: 실패 테스트** (GameManager)
   - `assembles host picks first on the field`: 호스트 2마리, 게스트 3마리면 파티 종 순서가 `[h0, g0, h1, g1, g2]`, 소유자가 맞고, 더블 배틀 첫 턴 필드 0은 호스트, 1은 게스트.
   - `creates starters from the shared seed`: 같은 `start`로 두 번 만들면 id가 같다(사이에 공유 RNG를 다른 값으로 소비해도).
   - `uses the co-op session slot`: 시작 후 `sessionSlotId === 5`.
   - `uses the host's timed event in co-op`: 비활성 기간의 가짜 이벤트가 협동에서 `timedEvent`가 그 이름이면 활성, 솔로면 비활성(관리자 `disabled`를 잠시 끔).
-- [ ] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
-- [ ] **Step 5: 커밋** — `feat(coop): start a co-op run from the start message`
+- [x] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
+- [x] **Step 5: 커밋** — `feat(coop): start a co-op run from the start message`
 
 ---
 
@@ -228,12 +228,12 @@ test/utils/
 - `export async function startCoopBattle(game: GameManager, options: { role: CoopRole; start: CoopStartInfo }): Promise<void>` — 타이틀까지 간 뒤 협동 게임 모드를 켜고 `startCoopRun(..., () => new SelectStarterPhase().initBattle([]))`, `CommandPhase`까지.
 - `export async function selectCoopStart(host: {...}, guest: {...}): Promise<CoopStartInfo>` — loopback 쌍 위에서 두 `CoopStarterSelection`을 레디시켜 양쪽 시작 정보를 얻고 같은지 확인.
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
   - `host and guest build the same party from the start message`: loopback 선택으로 얻은 호스트·게스트 시작 정보 각각으로 (호스트 계정, 호스트 역할) 실행과 (게스트 계정, 게스트 역할) 실행을 하고 파티의 `[id, speciesId, owner]` 열이 같다.
   - `first wave hash matches between host and guest with different accounts`: 위 두 실행의 첫 `CommandPhase` 해시(`computeCoopStateHash`)가 같다. 호스트 픽은 호스트만 해금한 알 기술을 쓰고, 게스트 로컬 계정은 trainerId·해금·알 기술이 다르다.
   - 기존 `coop-desync-replay.test.ts` 4개가 새 시작 경로로도 통과.
-- [ ] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
-- [ ] **Step 5: 커밋** — `test(coop): check both roles start the same run`
+- [x] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
+- [x] **Step 5: 커밋** — `test(coop): check both roles start the same run`
 
 ---
 
@@ -251,15 +251,15 @@ test/utils/
 - `export function isCoopAvailable(relayUrl = getDefaultRelayUrl()): boolean`
 - `openCoopLobby(connection)`: 로비 저장, `CoopStarterSelection` 생성(`getAccount: () => createAccountSnapshot(globalScene.gameData)`).
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
   - `connects host and guest through the handshake`: loopback에서 `hostCoop`이 코드 `LOOP00`을 알려 주고, 같은 코드로 `joinCoop`(가짜 `createTransport`)하면 양쪽이 상대 이름을 받는다.
   - `rejects a malformed join code without connecting`: `joinCoop("ab")`는 `CoopJoinInputError`, `createTransport`가 불리지 않는다.
   - `uses the address in the join input as the relay`: `"192.168.0.10:8787/abc123"`이면 `createTransport`가 `ws://192.168.0.10:8787`로 불린다.
   - `rejects a version mismatch`: 상대 버전이 다르면 `CoopVersionMismatchError`.
   - `co-op needs a relay url`: `isCoopAvailable(undefined) === false`, `isCoopAvailable("wss://r") === true`.
   - `leaving closes the lobby`: `openCoopLobby` 후 `leaveCoop()`이면 상대가 `closed`를 보고 `coopLobby === null`.
-- [ ] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
-- [ ] **Step 5: 커밋** — `feat(coop): add host and join connection flow`
+- [x] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
+- [x] **Step 5: 커밋** — `feat(coop): add host and join connection flow`
 
 ---
 
@@ -275,13 +275,13 @@ test/utils/
 - `export function showCoopTitleMenu(callbacks: { onConnected(): void; onCancel(): void }, deps?: { createTransport?; local? }): void` — `OPTION_SELECT`로 "호스트 / 참가 / 취소". 호스트는 코드를 메시지로 보여 주고 "취소" 버튼을 둔다. 참가는 `COOP_JOIN_FORM`을 띄운다. 연결되면 `openCoopLobby` 후 `onConnected`. 실패하면 이유(코드 형식, 코드 없음, 방 가득 참, 버전 다름, 연결 실패)를 보여 주고 `onCancel`.
 - `TitlePhase`: `isCoopAvailable()`일 때만 "협동 플레이" 항목. `onConnected`는 `gameMode = CLASSIC` 후 `end()`, `end()`는 로비가 있으면 `createCoopGameMode()`.
 
-- [ ] **Step 1: 실패 테스트** (GameManager)
+- [x] **Step 1: 실패 테스트** (GameManager)
   - `hides co-op without a relay url` / `shows co-op with a relay url`: `vi.stubEnv("VITE_COOP_RELAY_URL", ...)` 후 타이틀 옵션 라벨에 협동 항목 유무.
   - `hosting shows the join code and starts co-op starter select`: 가짜 `createTransport`(loopback 호스트 쪽)로 호스트를 고르면 메시지에 `LOOP00`이 보이고, 게스트가 같은 쌍으로 참가·핸드셰이크하면 `coopLobby`가 생기고 `SelectStarterPhase`로 넘어가며 `gameMode.isCoop`.
   - `join shows an error for a malformed code`: 폼에 `"x"`를 넣으면 형식 오류 문구를 보여 준다.
   - `falls back to built-in text when a key is missing`: `coopText("hostGame")`가 키 문자열이 아닌 기본 문구.
-- [ ] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
-- [ ] **Step 5: 커밋** — `feat(coop): add co-op title menu and join form`
+- [x] **Step 2: 실패 확인** → **Step 3: 구현** → **Step 4: 통과 확인**
+- [x] **Step 5: 커밋** — `feat(coop): add co-op title menu and join form`
 
 ---
 
@@ -300,19 +300,38 @@ test/utils/
   - 시작되면 `onStart(마지막으로 레디한 로컬 Starter)`.
 - `export function createCoopStarterSelectUi(layout): CoopStarterSelectController | null` — 로비가 없으면 `null`. 파트너 픽은 팀 창 4~6번 칸에 아이콘으로, 상태는 코스트 라벨 왼쪽에 글자로 표시.
 
-- [ ] **Step 1: 실패 테스트** (가짜 뷰, loopback, GameManager는 종 데이터용)
+- [x] **Step 1: 실패 테스트** (가짜 뷰, loopback, GameManager는 종 데이터용)
   - `confirming sends ready instead of starting`: `confirm` 후 상대가 레디 픽을 받고 `onStart`는 아직 안 불린다.
   - `cancel during ready unreadies`: 레디 중 `processInput(CANCEL)`이 `true`, 상대가 `ready: false`를 본다. 레디가 아닐 때는 `false`.
   - `shows the partner's confirmed picks`: 상대가 레디하면 뷰에 상대 픽과 `ready: true`.
   - `starts with the local starters when both are ready`: 양쪽 레디면 `onStart`가 로컬 `Starter` 배열로 불린다.
-- [ ] **Step 2: 실패 확인** → **Step 3: 구현과 핸들러 훅** → **Step 4: 통과 확인**
-- [ ] **Step 5: 커밋** — `feat(coop): wire co-op ready flow into starter select`
+- [x] **Step 2: 실패 확인** → **Step 3: 구현과 핸들러 훅** → **Step 4: 통과 확인**
+- [x] **Step 5: 커밋** — `feat(coop): wire co-op ready flow into starter select`
 
 ---
 
 ### Task 9: 마무리 확인
 
-- [ ] **Step 1:** Run: `pnpm test test/tests/coop && pnpm typecheck && pnpm biome:ci && pnpm exec ls-lint && pnpm coop:server:test` / Expected: 통과
-- [ ] **Step 2:** 훅을 지나는 기존 테스트 묶음(`test/tests/phases`, `test/tests/ui`, 타이틀·스타터·기간 한정 이벤트 관련) 실행 / Expected: 변경 전과 같은 결과
-- [ ] **Step 3:** 전체 `pnpm test:silent`(백그라운드)
-- [ ] **Step 4:** 이 문서에 "구현 메모" 추가, 체크박스 갱신, 커밋 — `docs: mark co-op connect and starters plan progress`
+- [x] **Step 1:** Run: `pnpm test test/tests/coop && pnpm typecheck && pnpm biome:ci && pnpm exec ls-lint && pnpm coop:server:test` / Expected: 통과
+- [x] **Step 2:** 훅을 지나는 기존 테스트 묶음(`test/tests/phases`, `test/tests/ui`, 타이틀·스타터·기간 한정 이벤트 관련) 실행 / Expected: 변경 전과 같은 결과
+- [x] **Step 3:** 전체 `pnpm test:silent`(백그라운드)
+- [x] **Step 4:** 이 문서에 "구현 메모" 추가, 체크박스 갱신, 커밋 — `docs: mark co-op connect and starters plan progress`
+
+---
+
+## 구현 메모 (계획과 달라진 점)
+
+구현하면서 계획과 다르게 정하거나 새로 알게 된 부분이다. 4단계 이후 계획은 이 내용을 기준으로 작성한다.
+
+1. **Task 순서 조정**: `coop-lobby.ts`(로비, `leaveCoop`, `startCoopRunFromLobby`)는 Task 4가 아니라 Task 6에서 만들었고, `SelectStarterPhase`의 협동 분기는 Task 8에서 달았다. 둘 다 연결·화면 흐름이 있어야 의미가 있어서다. Task 4는 세션·시드·파티·기간 한정 이벤트만 다룬다.
+2. **기록-재생 도구가 실제 시작 경로를 쓴다**: `runCoopReplay`는 이제 `startCoopBattle`(타이틀 → 협동 게임 모드 → `startCoopRun` → `initBattle([])`)으로 게임을 시작한다. 스타터는 고정값 페이로드(`createTestStarterPayload`)이고, `worldDataOverride`는 `start`의 호스트 스냅샷을 바꾼다. 2단계 `coop-desync-replay.test.ts` 4개는 고치지 않고 통과했다. `game.override.seed` 대신 `start.seed`가 공유 시드다.
+3. **타이틀로 돌아가면 협동을 떠난다**: `TitlePhase.start`가 `leaveCoop()`을 불러 로비·세션·연결을 정리한다(협동 런이 끝난 뒤 솔로 게임에 남은 세션이 새지 않게). 그래서 테스트는 타이틀을 지난 뒤에 세션을 열어야 한다. 2단계 `coop-random-call-sites.test.ts`의 GTS 테스트가 인카운터 진입 전에 세션을 열고 있어서, 인카운터 진입 후에 열도록 바꿨다(검사 내용은 같음).
+4. **`start`는 자기완결 메시지다**: 계획대로 호스트 스냅샷(`hostWorldData`)과 게스트 스냅샷(`guestAccount`), 양쪽 픽, 이벤트를 모두 싣는다. `starters`는 레디 여부와 상관없이 보낸 사람의 스냅샷(`account`)을 늘 싣는다(레디 취소 때 픽은 빈 배열).
+5. **시작 금액**: 솔로에서는 스타터 화면의 `startRun`이 `money`를 정한다. 협동에서는 `startCoopRun`이 다시 `getStartingMoney()`로 정한다(화면을 거치지 않는 경합 경로와 테스트에서도 양쪽이 같게).
+6. **세이브 슬롯 5 (임시)**: `startCoopRun`이 `sessionSlotId`를 `COOP_SESSION_SLOT = 5`로 바꾼다. 백엔드가 슬롯 5를 받기 전(6단계)에는 서버 저장이 범위 오류로 실패하고 솔로 슬롯 0~4는 건드리지 않는다. 오프라인(`bypassLogin`)이면 로컬 슬롯 5 키에 쓰는데, 세이브 슬롯 화면은 0~4만 보여 준다. 지금은 게스트도 슬롯 5에 쓰려 한다. 6단계에서 게스트 저장을 막아야 한다.
+7. **헤드리스에서 띄울 수 없는 화면**: 스타터 선택 화면의 `show()`는 헤드리스 테스트에서 `StarterContainer.setSpecies`가 던져서 실행되지 않는다(기존 `test/tests/ui/starter-select.test.ts`가 todo인 이유와 같음). 그래서 핸들러 훅(`show`의 컨트롤러 생성, `processInput` 첫 줄, `startRun` 레디 분기, `clear` 정리, 픽 한도 두 곳)은 테스트가 직접 지나지 않는다. 대신 컨트롤러는 가짜 뷰로, Phaser 뷰는 컨테이너에 붙는 개수와 아이콘 표시로, 단계 훅은 화면이 부를 콜백을 가로채 시험했다. 참가 코드 폼도 헤드리스 입력창에 `setFocus`가 없어 띄우지 않고 폼 설정(`buttonActions`)을 가로채 시험했다.
+8. **UI 모드가 GameManager보다 오래 산다**: 같은 Phaser 게임을 쓰는 다음 테스트에서 이미 `TITLE` 모드면 `setMode(TITLE)`이 무시되어 앞 테스트의 옵션이 남는다. 타이틀 메뉴 테스트는 시작 전에 `MESSAGE` 모드로 돌려 둔다.
+9. **문구**: `coopText`는 `i18next.t("coop:<키>", { defaultValue })`이고 기본 문구는 `i18next.language`가 `ko`로 시작하면 한국어, 아니면 영어다. 레디 대기 문구는 공간이 좁아 한 줄("준비 완료! 취소로 다시 고르기")로 줄였다.
+10. **화면 배치 (설계자 판단, 눈으로 확인하지 못함)**: 파트너의 확정 픽은 팀 창의 4~6번 칸에 아이콘으로, 상태 문구는 "시작" 라벨 왼쪽(`teamWindowX - 4, 162`)에 오른쪽 정렬로 그린다.
+11. **회귀 확인 (로컬)**: JSON 전용 `assets`로 전체 `pnpm test:silent`를 돌렸다. 테스트 파일 471개 통과·1개 실패·8개 건너뜀, 테스트 3220개 통과·8개 실패·6개 건너뜀·111개 todo. 실패 8개는 모두 `test/tests/pokemon/pokemon-sprite.test.ts`(이미지 없음, 환경 문제)다. 그 뒤 시작 금액 변경(5번) 후 `test/tests/coop` 19개 파일 128개 테스트가 통과했다. 최종 확인은 GitHub Actions `Tests` 워크플로우로 한다.
+12. **4단계 이후로 넘기는 것**: 협동 런이 시작된 뒤 명령 분배가 없어 지금은 한 클라이언트가 두 필드 자리를 모두 조작한다(4단계). 선택 중 연결이 끊기면 상태 문구만 바뀌고 재접속·자동 복귀는 없다(6단계). 협동 시작도 `classicSessionsPlayed`를 올린다(7단계에서 협동 통계로 나눌지 결정). 스타터 화면의 핑, 상대 픽 상세(이로치·특성) 표시는 없다.
