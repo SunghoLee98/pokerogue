@@ -67,3 +67,8 @@ SPDX-FileCopyrightText = "NONE"
 path = "favicon.ico"                        # Created by Gonstar (Paid Commission)
 SPDX-FileCopyrightText = "2024 Gonstar"
 SPDX-License-Identifier = "CC-BY-NC-SA-4.0"
+
+[[annotations]]
+path = ".claude/skills/**"                  # Claude Code skills vendored from https://github.com/obra/superpowers
+SPDX-FileCopyrightText = "2025 Jesse Vincent"
+SPDX-License-Identifier = "MIT"
