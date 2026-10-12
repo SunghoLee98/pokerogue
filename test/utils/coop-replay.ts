@@ -198,6 +198,28 @@ export async function startCoopBattle(game: GameManager, options: CoopBattleStar
   await game.phaseInterceptor.to("CommandPhase");
 }
 
+/**
+ * Start a co-op battle at `wave`, win it on the first turn (the local player's Hyper Voice, the partner's Splash)
+ * and wait until the reward screen takes input. The moveset must include both moves.
+ * @returns The scripted partner
+ */
+export async function toCoopRewardScreen(
+  game: GameManager,
+  role: CoopRole,
+  wave: number,
+  start: CoopStartInfo,
+): Promise<CoopTestPartner> {
+  game.override.startingWave(wave);
+  const partner = new CoopTestPartner(role);
+  await startCoopBattle(game, { role, start, transport: partner.localTransport });
+  game.move.select(MoveId.HYPER_VOICE, FIELD_BY_ROLE[role]);
+  partner.sendCommand(synthesizeMoveCommand(FIELD_BY_ROLE[role === "host" ? "guest" : "host"], MoveId.SPLASH));
+  await game.phaseInterceptor.to("SelectModifierPhase");
+  const handler = game.scene.ui.handlers[UiMode.MODIFIER_SELECT] as unknown as { awaitingActionInput: boolean };
+  await vi.waitUntil(() => game.scene.ui.mode === UiMode.MODIFIER_SELECT && handler.awaitingActionInput);
+  return partner;
+}
+
 export interface CoopSelectionSide {
   picks: CoopStarterPayload[];
   account: CoopAccountSnapshot;
