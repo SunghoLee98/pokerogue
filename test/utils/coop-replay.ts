@@ -494,9 +494,13 @@ async function inputRewards(
   };
 
   // Both runs hash the first screen (with its offered rewards) before anyone acts on it.
-  await toRewardScreen(game, first);
+  const firstScreen = await toRewardScreen(game, first);
   checkpoint();
 
+  const local = actionsOf(role);
+  const localGens = screensFor(local, first);
+  const onFirstScreen = localGens.filter(gen => gen === first).length;
+  let remoteMessages: CoopMessage[] = [];
   if ("log" in remote) {
     const recorded = remote.log.inputs.filter(i => i.by === by && i.message.t === "reward" && i.message.wave === wave);
     for (const { message } of recorded) {
@@ -515,16 +519,25 @@ async function inputRewards(
     // Only the guest's requests are made up: the host under test numbers them.
     const actions = actionsOf(by);
     const gens = screensFor(actions, first);
-    actions.forEach((action, i) => {
-      send({ t: "reward", wave, gen: gens[i], req: remoteRequests.count++, by, action });
-    });
+    remoteMessages = actions.map((action, i) => ({
+      t: "reward",
+      wave,
+      gen: gens[i],
+      req: remoteRequests.count++,
+      by,
+      action,
+    }));
   }
 
-  const local = actionsOf(role);
-  const gens = screensFor(local, first);
+  // The local player acts on the first screen before the made-up partner requests arrive, so the order is fixed.
+  for (const action of local.slice(0, onFirstScreen)) {
+    submitCoopRewardAction(firstScreen, action);
+  }
+  remoteMessages.forEach(send);
   for (const [i, action] of local.entries()) {
-    const phase = await toRewardScreen(game, gens[i]);
-    submitCoopRewardAction(phase, action);
+    if (i >= onFirstScreen) {
+      submitCoopRewardAction(await toRewardScreen(game, localGens[i]), action);
+    }
   }
   await game.phaseInterceptor.to("TurnInitPhase");
   await game.phaseInterceptor.to("CommandPhase");

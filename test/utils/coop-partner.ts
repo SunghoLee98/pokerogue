@@ -46,6 +46,8 @@ export function synthesizeMoveCommand(
       move: { move: moveId, targets: picksTarget ? [] : moveTargets.targets, useMode: MoveUseMode.NORMAL },
       args: [MoveUseMode.NORMAL, undefined],
       ...(picksTarget && { targets: [target ?? moveTargets.targets[0]] }),
+      // A spread move still goes through target selection, which confirms all of its targets.
+      ...(moveTargets.targets.length > 1 && moveTargets.multiple && { targets: moveTargets.targets }),
     },
     preTurnCommand: { command: Command.FIGHT, targets: [fieldIndex], skip: true },
   });
