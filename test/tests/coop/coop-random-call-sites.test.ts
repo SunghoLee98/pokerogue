@@ -110,12 +110,16 @@ describe("co-op seeded randomness at call sites", () => {
       vi.spyOn(MysteryEncounters, "mysteryEncountersByBiome", "get").mockReturnValue(biomeMap);
     });
 
-    const tradeWithFixedRolls = async () => {
+    /** @param coop - Whether to trade in co-op; the session starts after the title screen, which leaves co-op */
+    const tradeWithFixedRolls = async (coop: boolean) => {
       await game.runToMysteryEncounter(MysteryEncounterType.GLOBAL_TRADE_SYSTEM, [
         SpeciesId.LAPRAS,
         SpeciesId.GENGAR,
         SpeciesId.ABRA,
       ]);
+      if (coop) {
+        startCoop();
+      }
       // Unseeded rolls pick the highest value, seeded rolls pick 1.
       vi.spyOn(Utils, "randInt").mockImplementation((range: number, min = 0) => min + range - 1);
       vi.spyOn(Utils, "randSeedInt").mockReturnValue(1);
@@ -124,12 +128,11 @@ describe("co-op seeded randomness at call sites", () => {
     };
 
     it("stays unseeded in solo", async () => {
-      expect(await tradeWithFixedRolls()).toBe(3);
+      expect(await tradeWithFixedRolls(false)).toBe(3);
     });
 
     it("uses the seeded RNG in co-op", async () => {
-      startCoop();
-      expect(await tradeWithFixedRolls()).toBe(1);
+      expect(await tradeWithFixedRolls(true)).toBe(1);
     });
   });
 });

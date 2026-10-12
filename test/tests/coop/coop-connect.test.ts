@@ -177,6 +177,8 @@ describe("co-op run from the lobby", () => {
   it("starts the agreed run and hands the lobby over to the session", async () => {
     const game = new GameManager(phaserGame);
     game.override.battleStyle("double").disableTrainerWaves();
+    // The title screen leaves co-op, so the lobby is opened once there, as after connecting from the co-op menu.
+    await game.runToTitle();
     const pair = createLoopbackPair();
     await pair.host.host();
     await pair.guest.join("LOOP00");
@@ -190,7 +192,6 @@ describe("co-op run from the lobby", () => {
     await flush();
     expect(lobby.selection.startInfo).not.toBeNull();
 
-    await game.runToTitle();
     game.onNextPrompt("TitlePhase", UiMode.TITLE, async () => {
       game.scene.gameMode = createCoopGameMode();
       game.scene.phaseManager.pushNew("EncounterPhase", false);

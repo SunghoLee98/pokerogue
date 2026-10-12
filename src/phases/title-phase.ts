@@ -8,6 +8,10 @@ import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { activeOverrides } from "#app/overrides";
 import { Phase } from "#app/phase";
 import { bypassLogin } from "#constants/app-constants";
+import { isCoopAvailable } from "#coop/coop-connect";
+import { createCoopGameMode } from "#coop/coop-game-start";
+import { coopLobby, leaveCoop } from "#coop/coop-lobby";
+import { createCoopTitleOption } from "#coop/coop-title-menu";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-run";
 import { modifierTypes } from "#data/data-lists";
 import { Gender } from "#data/gender";
@@ -35,6 +39,7 @@ export class TitlePhase extends Phase {
 
   async start(): Promise<void> {
     super.start();
+    leaveCoop();
 
     globalScene.ui.clearText();
     globalScene.ui.fadeIn(250);
@@ -188,6 +193,19 @@ export class TitlePhase extends Phase {
         keepOpen: true,
       },
     );
+    if (isCoopAvailable()) {
+      const coopOption = createCoopTitleOption({
+        onConnected: () => {
+          this.gameMode = GameModes.CLASSIC;
+          this.end();
+        },
+        onCancel: () => {
+          globalScene.phaseManager.toTitleScreen();
+          super.end();
+        },
+      });
+      options.splice(options.findIndex(o => o.label === i18next.t("menu:newGame")) + 1, 0, coopOption);
+    }
     const config: OptionSelectModeConfig = { options, blockCancelButton: true };
     await ui.setMode(UiMode.TITLE, config);
   }
@@ -352,7 +370,7 @@ export class TitlePhase extends Phase {
   // TODO: Refactor this
   end(): void {
     if (!this.loaded && !globalScene.gameMode.isDaily) {
-      globalScene.gameMode = getGameMode(this.gameMode);
+      globalScene.gameMode = coopLobby ? createCoopGameMode() : getGameMode(this.gameMode);
       if (this.gameMode === GameModes.CHALLENGE) {
         globalScene.phaseManager.pushNew("SelectChallengePhase");
       } else {
