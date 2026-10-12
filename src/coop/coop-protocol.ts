@@ -12,7 +12,7 @@ import type { SpeciesId } from "#enums/species-id";
 import type { Variant } from "#sprites/variant";
 
 /** Bumped whenever a message shape changes incompatibly. Peers with different versions refuse to connect. */
-export const COOP_PROTOCOL_VERSION = 2;
+export const COOP_PROTOCOL_VERSION = 3;
 
 export type CoopRole = "host" | "guest";
 
@@ -87,7 +87,33 @@ export interface CoopTurnCommandPayload {
 export type CoopDecision =
   | { kind: "switch"; seq: number; slotIndex: number; option: number }
   | { kind: "capture"; seq: number; action: "replace"; releasedId: number; insertIndex: number }
-  | { kind: "capture"; seq: number; action: "keepOut" };
+  | { kind: "capture"; seq: number; action: "keepOut" }
+  /** The option picked in a list (a biome, an encounter's follow-up option) */
+  | { kind: "option"; seq: number; index: number }
+  /** The party slot picked in an encounter; a slot outside the party for none */
+  | { kind: "partySelect"; seq: number; slot: number }
+  /** The party slot picked for a move's effect (Revival Blessing), a `PartyOption` in `option` */
+  | { kind: "partyPick"; seq: number; slotIndex: number; option: number }
+  /** The move slot a new move replaces, `-1` if the move was not learned */
+  | { kind: "learnMove"; seq: number; moveIndex: number }
+  /** Whether the owner stopped an evolution, and whether they paused further evolutions */
+  | { kind: "evolution"; seq: number; cancelled: boolean; paused: boolean };
+
+export type CoopDecisionKind = CoopDecision["kind"];
+
+/**
+ * Something done on the reward screen that changes the run (spec 3.5).
+ * Option numbers index the offered rewards (`reward`) or the wave's shop list, flattened (`shop`).
+ * `slot` is the party slot of the target, `partyOption` the party screen option picked with it (a move for PP items),
+ * `splice` the second pokemon of a fusion.
+ */
+export type CoopRewardAction =
+  | { kind: "reward"; option: number; slot?: number; partyOption?: number; splice?: number }
+  | { kind: "shop"; option: number; slot?: number; partyOption?: number }
+  | { kind: "reroll" }
+  | { kind: "lock" }
+  | { kind: "transfer"; from: number; itemIndex: number; quantity: number; to: number }
+  | { kind: "skip" };
 
 // Payloads below are narrowed by later co-op plans.
 export type TurnCommandPayload = CoopTurnCommandPayload;
@@ -115,13 +141,38 @@ export type CoopMessage =
       timedEvent: string | null;
     }
   | { t: "turnCommand"; turn: number; wave: number; command: TurnCommandPayload }
+  /**
+   * A choice for the partner's client to apply. Decisions (`CoopDecision` kinds) carry their sequence number in the
+   * payload; `ownerAsk` (`{ seq, slot }`) and `optionAsk` (`{ seq, index }`) ask the partner to confirm, and
+   * `meOption` (`{ index }`) is the picked encounter option.
+   */
   | { t: "choice"; kind: CoopChoiceKind; wave: number; payload: unknown }
-  | { t: "ping"; kind: CoopChoiceKind; payload: unknown }
+  /** A hint for the partner: "pick this one". `row` and `cursor` on the reward screen, `index` in a list. */
+  | { t: "ping"; kind: "reward" | "option" | "encounter"; payload: { row?: number; cursor?: number; index?: number } }
   | { t: "checksum"; wave: number; turn: number; hash: string }
-  /** The guest requests without `seq`; the host confirms by attaching one. */
-  | { t: "shopBuy"; wave: number; seq?: number; option: number; target: number }
-  /** For `flee`, `turn` is the battle turn of the declined proposal. */
-  | { t: "confirm"; kind: "mePokemon" | "meOption" | "flee"; wave: number; turn: number; accepted: boolean }
+  /**
+   * A reward screen action (spec 3.5, generalizing `shopBuy`). `gen` is the reward screen the requester saw and `req`
+   * the requester's own count. The guest requests without `seq`; the host attaches the order in which it took the
+   * requests (its own included) and sends the result to both clients, which apply events in `seq` order only.
+   */
+  | {
+      t: "reward";
+      wave: number;
+      gen: number;
+      req: number;
+      by: CoopRole;
+      action: CoopRewardAction;
+      seq?: number;
+    }
+  /** For `flee`, `turn` is the battle turn of the declined proposal; other kinds echo the asker's `seq`. */
+  | {
+      t: "confirm";
+      kind: "mePokemon" | "meOption" | "flee";
+      wave: number;
+      turn?: number;
+      seq?: number;
+      accepted: boolean;
+    }
   | { t: "resume"; session: CoopSessionSnapshot }
   | { t: "bye" };
 
@@ -133,7 +184,7 @@ const COOP_MESSAGE_KINDS = [
   "choice",
   "ping",
   "checksum",
-  "shopBuy",
+  "reward",
   "confirm",
   "resume",
   "bye",
