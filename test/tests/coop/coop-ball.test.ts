@@ -15,6 +15,7 @@ import type { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { CoopTestPartner, synthesizeBallCommand, synthesizeMoveCommand } from "#test/utils/coop-partner";
 import { createTestStarterPayload, startCoopBattle } from "#test/utils/coop-replay";
+import type { CommandUiHandler } from "#ui/command-ui-handler";
 import type { TargetSelectUiHandler } from "#ui/target-select-ui-handler";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -100,6 +101,8 @@ describe("co-op balls", () => {
     await start("host");
     game.scene.pokeballCounts[PokeballType.POKEBALL] = 5;
     const phase = commandPhase();
+    // Open the ball list from the command menu, as a player does.
+    await game.scene.ui.setModeWithoutClear(UiMode.BALL);
 
     expect(phase.handleCommand(Command.BALL, PokeballType.POKEBALL)).toBe(false);
     expect(game.scene.ui.mode).toBe(UiMode.TARGET_SELECT);
@@ -112,6 +115,9 @@ describe("co-op balls", () => {
       cursor: PokeballType.POKEBALL,
       targets: [BattlerIndex.ENEMY_2],
     });
+    // The command menu under the ball list is closed, as after a solo throw.
+    const commandUi = game.scene.ui.handlers[UiMode.COMMAND] as CommandUiHandler;
+    expect(commandUi["commandsContainer"].visible).toBe(false);
   });
 
   it("goes back to the balls when the target choice is cancelled", async () => {

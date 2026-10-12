@@ -63,7 +63,11 @@ export function openCoopBallTargetSelect(phase: CommandPhase, ball: PokeballType
       ui.setMode(UiMode.BALL);
       return;
     }
-    withCoopBallTarget(targets[0], () => phase.handleCommand(Command.BALL, ball));
+    if (withCoopBallTarget(targets[0], () => phase.handleCommand(Command.BALL, ball))) {
+      // Close the command menu left open under the ball list, as the ball list does after a solo throw.
+      ui.setMode(UiMode.COMMAND, phase.getFieldIndex());
+      ui.setMode(UiMode.MESSAGE);
+    }
   });
   return true;
 }
