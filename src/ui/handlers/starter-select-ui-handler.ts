@@ -3164,6 +3164,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         const starters = this.partyStarters.slice(0);
         ui.setMode(UiMode.STARTER_SELECT);
         if (this.coopUi?.confirm(starters)) {
+          this.clearText();
           return;
         }
         const originalStarterSelectCallback = this.starterSelectCallback;

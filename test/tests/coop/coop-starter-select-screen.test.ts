@@ -1,0 +1,102 @@
+import { leaveCoop, openCoopLobby } from "#coop/coop-lobby";
+import { createCoopStarterSelectUi } from "#coop/coop-starter-select-ui";
+import { createLoopbackPair } from "#coop/loopback-transport";
+import { Button } from "#enums/buttons";
+import { Nature } from "#enums/nature";
+import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
+import { GameManager } from "#test/framework/game-manager";
+import type { Starter } from "#types/save-data";
+import type { ConfirmModeConfig } from "#types/ui-types";
+import type { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
+import Phaser from "phaser";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+const emptySnapshot = { trainerId: 0, secretId: 0, caughtSpecies: [], eggMoves: {}, unlocks: [] };
+
+function starter(speciesId: SpeciesId): Starter {
+  return {
+    speciesId,
+    shiny: false,
+    variant: 0,
+    formIndex: 0,
+    abilityIndex: 0,
+    passive: false,
+    nature: Nature.HARDY,
+    pokerus: false,
+    ivs: [20, 20, 20, 20, 20, 20],
+  };
+}
+
+// The starter select screen cannot be shown headless (see `coop-starter-select-ui.test.ts`), so these tests set up
+// the parts of the real handler that the co-op flow touches and drive them directly.
+describe("co-op on the starter select screen", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+  let handler: StarterSelectUiHandler;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  afterEach(() => {
+    handler["coopUi"]?.destroy();
+    handler["coopUi"] = null;
+    handler["partyStarters"].splice(0);
+    handler.partyStarterIds.splice(0);
+    handler.clearText();
+    leaveCoop();
+    vi.restoreAllMocks();
+  });
+
+  async function setUp() {
+    game = new GameManager(phaserGame);
+    handler = game.scene.ui.handlers[UiMode.STARTER_SELECT] as StarterSelectUiHandler;
+    const pair = createLoopbackPair();
+    await pair.host.host();
+    await pair.guest.join("LOOP00");
+    const lobby = openCoopLobby(
+      { role: "guest", transport: pair.guest, peerAccountName: "Hosty" },
+      { getAccount: () => emptySnapshot },
+    );
+    handler["coopUi"] = createCoopStarterSelectUi(
+      handler["starterSelectContainer"],
+      { iconPosition: i => [0, i * 10], statusPosition: [0, 0] },
+      () => {},
+    );
+    handler["partyStarters"].push(starter(SpeciesId.CHARMANDER));
+    handler.partyStarterIds.push(SpeciesId.CHARMANDER);
+
+    const { ui } = game.scene;
+    vi.spyOn(ui, "showText").mockImplementation((text, _delay, callback) => {
+      handler.showText(text, 0);
+      callback?.();
+    });
+    const confirms: ConfirmModeConfig[] = [];
+    vi.spyOn(ui, "setModeWithoutClear").mockImplementation((mode, config) => {
+      if (mode === UiMode.CONFIRM) {
+        confirms.push(config);
+      }
+      return Promise.resolve();
+    });
+    vi.spyOn(ui, "setMode").mockResolvedValue();
+    return { lobby, confirms };
+  }
+
+  const messageBoxVisible = () => handler["starterSelectMessageBoxContainer"].visible;
+
+  it("closes the start prompt once the player is ready", async () => {
+    const { lobby, confirms } = await setUp();
+
+    handler["tryStart"](true);
+    expect(messageBoxVisible()).toBe(true);
+    confirms[0].yesHandler();
+
+    expect(lobby.selection.localReady).toBe(true);
+    expect(messageBoxVisible()).toBe(false);
+
+    handler.processInput(Button.CANCEL);
+    expect(lobby.selection.localReady).toBe(false);
+    expect(messageBoxVisible()).toBe(false);
+  });
+});
