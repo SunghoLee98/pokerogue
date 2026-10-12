@@ -91,7 +91,7 @@ test/tests/coop/
   - `export function decodeCoopMessage(raw: string): CoopMessage | null` — JSON이 아니거나 객체가 아니거나 `t`가 알려진 종류가 아니면 `null`.
   - `export function normalizeJoinCode(input: string): string | null` — 공백과 `-` 제거, 대문자화, 결과가 정확히 `[A-Z0-9]{6}`가 아니면 `null`.
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 ```ts
 describe("coop-protocol", () => {
@@ -119,10 +119,10 @@ describe("coop-protocol", () => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-protocol.test.ts` / Expected: FAIL, `#coop/coop-protocol` 모듈을 찾을 수 없음
-- [ ] **Step 3: 별칭, 환경 변수 타입, `coop-protocol.ts` 구현.** `decodeCoopMessage`는 알려진 `t` 값 목록(`as const` 배열)으로 검사한다. 필드 단위 검증은 하지 않는다(신뢰 기반, 스펙 2장 비목표).
-- [ ] **Step 4: 통과 확인** — Run: `pnpm test test/tests/coop/coop-protocol.test.ts && pnpm typecheck` / Expected: PASS, 타입 오류 없음
-- [ ] **Step 5: 커밋** — `git add tsconfig.json src/vite.env.d.ts src/coop test/tests/coop && git commit -m "feat(coop): add co-op protocol types"`
+- [x] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-protocol.test.ts` / Expected: FAIL, `#coop/coop-protocol` 모듈을 찾을 수 없음
+- [x] **Step 3: 별칭, 환경 변수 타입, `coop-protocol.ts` 구현.** `decodeCoopMessage`는 알려진 `t` 값 목록(`as const` 배열)으로 검사한다. 필드 단위 검증은 하지 않는다(신뢰 기반, 스펙 2장 비목표).
+- [x] **Step 4: 통과 확인** — Run: `pnpm test test/tests/coop/coop-protocol.test.ts && pnpm typecheck` / Expected: PASS, 타입 오류 없음
+- [x] **Step 5: 커밋** — `git add tsconfig.json src/vite.env.d.ts src/coop test/tests/coop && git commit -m "feat(coop): add co-op protocol types"`
 
 ---
 
@@ -141,15 +141,15 @@ describe("coop-protocol", () => {
   - 모든 구현체 공통 규칙: 첫 `onMessage` 핸들러가 등록되기 전에 도착한 메시지는 버퍼에 쌓았다가 등록 시 순서대로 전달한다. `close()` 후 `send`는 조용히 무시한다.
   - `export function createLoopbackPair(): { host: CoopTransport; guest: CoopTransport }` — `host()`는 `{ joinCode: "LOOP00" }`, 게스트 `join("LOOP00")` 시 양쪽 상태가 `"connected"`. 다른 코드면 `Error("unknown join code")`로 reject. 메시지는 `queueMicrotask`로 비동기 전달(실제 네트워크처럼 같은 틱에 도착하지 않음). 한쪽 `close()` 시 상대 상태 `"closed"`.
 
-- [ ] **Step 1: 실패하는 테스트 작성** — 테스트 이름과 단언:
+- [x] **Step 1: 실패하는 테스트 작성** — 테스트 이름과 단언:
   - `delivers messages both ways in order`: host가 `bye` 직전 `hello` 두 개를 보내면 guest 핸들러가 같은 순서로 받는다.
   - `buffers messages until the first handler subscribes`: guest가 핸들러 없이 있을 때 host가 보낸 `hello`를 나중에 등록한 핸들러가 받는다.
   - `notifies the peer on close`: host `close()` 후 guest `onStatusChange`가 `"closed"`를 받고, 이후 host `send`는 throw하지 않는다.
   - `join rejects an unknown code`: `await expect(guest.join("ZZZZZZ")).rejects.toThrow("unknown join code")`.
-- [ ] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/loopback-transport.test.ts` / Expected: FAIL, 모듈 없음
-- [ ] **Step 3: 구현**
-- [ ] **Step 4: 통과 확인** — 같은 명령 / Expected: PASS
-- [ ] **Step 5: 커밋** — `git commit -m "feat(coop): add transport interface and loopback transport"`
+- [x] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/loopback-transport.test.ts` / Expected: FAIL, 모듈 없음
+- [x] **Step 3: 구현**
+- [x] **Step 4: 통과 확인** — 같은 명령 / Expected: PASS
+- [x] **Step 5: 커밋** — `git commit -m "feat(coop): add transport interface and loopback transport"`
 
 ---
 
@@ -177,24 +177,24 @@ describe("coop-protocol", () => {
 - `coop-server/package.json`: `"type": "module"`, `"private": true`, `"engines": { "node": ">=24" }`, dependencies `ws`(작성 시점에서 2주 이상 지난 정확한 버전, pnpm `minimumReleaseAge: 1440` 준수), devDependencies `@types/ws`, scripts `"test": "node --test test/"`, `"start": "node src/main.ts"`. Node 24의 타입 제거 실행을 쓰므로 `enum`, 매개변수 프로퍼티 같은 비삭제 문법은 쓰지 않는다.
 - 각 파일 첫 줄: `// SPDX-FileCopyrightText: 2026 SunghoLee98` / `// SPDX-License-Identifier: AGPL-3.0-only`(`package.json`은 `REUSE.toml`에 `coop-server/package.json`을 CC0 목록에 추가).
 
-- [ ] **Step 1: `room-registry` 실패 테스트 작성** — 테스트 이름과 단언:
+- [x] **Step 1: `room-registry` 실패 테스트 작성** — 테스트 이름과 단언:
   - `creates unique six-character codes`: 100번 생성해 모두 `/^[A-Z0-9]{6}$/`이고 중복 없음.
   - `rejects a third client`: `join(code)` 두 번째는 `"full"`.
   - `rejects an unknown code`: `join("ZZZZZZ")`는 `"notFound"`.
   - `expires an unjoined room after ten minutes`: 시간 `+599_999`에 `sweep()`은 `[]`, `+600_000`에 `[code]`.
   - `keeps a vacated slot for sixty seconds`: 참가 후 `leave(code,"guest")`, `+59_999` 시 `join(code,"guest")`가 `"ok"`; 다른 방에서 `+60_000` 후 `sweep()`에 포함.
-- [ ] **Step 2: 실패 확인** — Run: `pnpm --dir coop-server install && pnpm coop:server:test` / Expected: FAIL, 모듈 없음
-- [ ] **Step 3: `room-registry.ts` 구현**
-- [ ] **Step 4: `relay-server` 실패 테스트 작성** — `startRelayServer({ port: 0 })`에 `ws` 클라이언트 3개로 접속:
+- [x] **Step 2: 실패 확인** — Run: `pnpm --dir coop-server install && pnpm coop:server:test` / Expected: FAIL, 모듈 없음
+- [x] **Step 3: `room-registry.ts` 구현**
+- [x] **Step 4: `relay-server` 실패 테스트 작성** — `startRelayServer({ port: 0 })`에 `ws` 클라이언트 3개로 접속:
   - `pairs host and guest and forwards frames verbatim`: 호스트가 `relay:code`를 받고, 게스트가 그 코드로 접속하면 양쪽이 `relay:paired`, 호스트가 보낸 `'{"t":"hello","x":1}'`을 게스트가 바이트 그대로 받는다.
   - `rejects a third client`: 세 번째 접속이 `{t:"relay:error",reason:"full"}` 후 닫히고, 기존 두 연결은 계속 메시지를 주고받는다.
   - `tells the peer when one side drops and allows rejoin`: 게스트 소켓 종료 → 호스트가 `relay:peerLeft`; `?code=X&rejoin=guest`로 재접속 → 양쪽 `relay:paired`.
   - `rejects a bad request`: 쿼리 없이 접속하면 `reason:"badRequest"`.
-- [ ] **Step 5: `relay-server.ts`, `main.ts` 구현**
-- [ ] **Step 6: 통과 확인** — Run: `pnpm coop:server:test` / Expected: PASS 9개
-- [ ] **Step 7: 수동 확인** — Run: `pnpm coop:local` / Expected: `coop relay listening on 0.0.0.0:8787` 출력, Ctrl+C로 종료
-- [ ] **Step 8: 린트 확인** — Run: `pnpm biome:ci && pnpm exec ls-lint && uvx reuse lint` / Expected: 모두 통과
-- [ ] **Step 9: 커밋** — `git commit -m "feat(coop): add relay server"`
+- [x] **Step 5: `relay-server.ts`, `main.ts` 구현**
+- [x] **Step 6: 통과 확인** — Run: `pnpm coop:server:test` / Expected: PASS 9개
+- [x] **Step 7: 수동 확인** — Run: `pnpm coop:local` / Expected: `coop relay listening on 0.0.0.0:8787` 출력, Ctrl+C로 종료
+- [x] **Step 8: 린트 확인** — Run: `pnpm biome:ci && pnpm exec ls-lint && uvx reuse lint` / Expected: 모두 통과
+- [x] **Step 9: 커밋** — `git commit -m "feat(coop): add relay server"`
 
 ---
 
@@ -217,18 +217,18 @@ describe("coop-protocol", () => {
   - `export function parseJoinInput(input: string, defaultRelayUrl: string): { relayUrl: string; code: string } | null` — `"192.168.0.10:8787/abcd12"`처럼 `/` 앞에 호스트가 있으면 `relayUrl = "ws://192.168.0.10:8787"`, 아니면 `defaultRelayUrl`. 코드는 `normalizeJoinCode`로 정규화, 실패 시 `null`.
   - `export function getDefaultRelayUrl(): string | undefined` — `import.meta.env.VITE_COOP_RELAY_URL`.
 
-- [ ] **Step 1: 실패하는 테스트 작성** — `createSocket`에 가짜 소켓(`send` 기록, `emitMessage(text)`, `emitClose()` 제공)을 주입한다. `vi.useFakeTimers()` 사용. 테스트 이름과 단언:
+- [x] **Step 1: 실패하는 테스트 작성** — `createSocket`에 가짜 소켓(`send` 기록, `emitMessage(text)`, `emitClose()` 제공)을 주입한다. `vi.useFakeTimers()` 사용. 테스트 이름과 단언:
   - `host resolves with the relay code`: 가짜 소켓 URL이 `wss://relay.test?role=host`, `relay:code` 주입 후 `{ joinCode: "ABC123" }`.
   - `join rejects with the relay error`: `relay:error notFound` 주입 → `CoopRelayError`, `reason === "notFound"`.
   - `buffers messages until the first handler subscribes`: paired 후 게임 메시지 주입, 나중에 등록한 핸들러가 받음.
   - `reconnects with rejoin after an unexpected close`: `emitClose()` 후 상태 `"reconnecting"`, `2_000`ms 진행 시 새 소켓 URL이 `...?code=ABC123&rejoin=host`.
   - `gives up after sixty seconds`: 재접속 소켓도 계속 닫히게 하고 `60_000`ms 진행 시 상태 `"closed"`.
   - `parseJoinInput handles local addresses and messy codes`: `parseJoinInput("192.168.0.10:8787/ ab-c123", "wss://r")`가 `{ relayUrl: "ws://192.168.0.10:8787", code: "ABC123" }`; `parseJoinInput("abc123", "wss://r")`가 `{ relayUrl: "wss://r", code: "ABC123" }`; `parseJoinInput("x/12", "wss://r")`는 `null`.
-- [ ] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/relay-websocket-transport.test.ts` / Expected: FAIL
-- [ ] **Step 3: 구현**
-- [ ] **Step 4: 통과 확인** — 같은 명령 / Expected: PASS
-- [ ] **Step 5: 실제 서버로 수동 확인** — 한 터미널 `pnpm coop:local`, 다른 터미널에서 `node -e`로 `ws` 클라이언트 두 개를 띄워 `?role=host`와 `?code=<받은 코드>`로 접속해 서로 텍스트가 오가는지 본다. Expected: 양쪽 `relay:paired`와 전달된 텍스트 출력
-- [ ] **Step 6: 커밋** — `git commit -m "feat(coop): add relay websocket transport"`
+- [x] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/relay-websocket-transport.test.ts` / Expected: FAIL
+- [x] **Step 3: 구현**
+- [x] **Step 4: 통과 확인** — 같은 명령 / Expected: PASS
+- [x] **Step 5: 실제 서버로 수동 확인** — 한 터미널 `pnpm coop:local`, 다른 터미널에서 `node -e`로 `ws` 클라이언트 두 개를 띄워 `?role=host`와 `?code=<받은 코드>`로 접속해 서로 텍스트가 오가는지 본다. Expected: 양쪽 `relay:paired`와 전달된 텍스트 출력
+- [x] **Step 6: 커밋** — `git commit -m "feat(coop): add relay websocket transport"`
 
 ---
 
@@ -246,15 +246,15 @@ describe("coop-protocol", () => {
   - `export class CoopHandshakeError extends Error {}`
   - 호출하는 쪽(3번 계획의 UI)은 `gameVersion`에 `#package.json`의 `version`을 넘긴다.
 
-- [ ] **Step 1: 실패하는 테스트 작성** — loopback 쌍으로:
+- [x] **Step 1: 실패하는 테스트 작성** — loopback 쌍으로:
   - `exchanges account names`: 양쪽 `performHandshake`가 각각 상대 이름을 돌려준다.
   - `rejects mismatched game versions on both sides`: `"1.12.1.0"`과 `"1.12.2.0"` → 양쪽 모두 `CoopVersionMismatchError`, 오류에 두 버전이 담김.
   - `rejects when the peer closes before hello`: 게스트가 hello 없이 `close()` → 호스트가 `CoopHandshakeError`.
   - `times out`: `vi.useFakeTimers()`, 상대가 아무것도 안 보내면 `15_000`ms 후 `CoopHandshakeError`.
-- [ ] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-handshake.test.ts` / Expected: FAIL
-- [ ] **Step 3: 구현**
-- [ ] **Step 4: 통과 확인** — 같은 명령 / Expected: PASS
-- [ ] **Step 5: 커밋** — `git commit -m "feat(coop): add version handshake"`
+- [x] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-handshake.test.ts` / Expected: FAIL
+- [x] **Step 3: 구현**
+- [x] **Step 4: 통과 확인** — 같은 명령 / Expected: PASS
+- [x] **Step 5: 커밋** — `git commit -m "feat(coop): add version handshake"`
 
 ---
 
@@ -272,13 +272,28 @@ describe("coop-protocol", () => {
   - `export class CoopSession` — `constructor(readonly localRole: CoopRole, readonly transport: CoopTransport, readonly ownership = new CoopOwnership())`; `get remoteRole(): CoopRole`; `pickerForWave(waveIndex: number): CoopRole`(홀수 웨이브 호스트, 짝수 게스트, 스펙 3.5); `isLocalPicker(waveIndex: number): boolean`; `isLocallyOwned(pokemonId: number): boolean`
   - `export let coopSession: CoopSession | null = null;` `export function setCoopSession(session: CoopSession | null): void` — 이후 모든 협동 분기는 `coopSession?.`로 시작한다(스펙 4.3).
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
   - `alternates the reward picker by wave`: `pickerForWave(1) === "host"`, `pickerForWave(2) === "guest"`, `pickerForWave(200) === "guest"`.
   - `counts only owned pokemon still in the party`: id 1,2,3 host, 4 guest 등록 → `countOwnedBy("host", [1, 2, 4]) === 2`.
   - `round-trips ownership through JSON`: `CoopOwnership.fromJSON(JSON.parse(JSON.stringify(o))).get(4) === "guest"`.
   - `exposes the session globally`: `setCoopSession(s)` 후 `coopSession === s`, `setCoopSession(null)` 후 `null`. (`afterEach`에서 `null`로 초기화)
-- [ ] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-session.test.ts` / Expected: FAIL
-- [ ] **Step 3: 구현**
-- [ ] **Step 4: 전체 확인** — Run: `pnpm test test/tests/coop && pnpm typecheck && pnpm biome:ci && pnpm exec ls-lint && pnpm coop:server:test` / Expected: 모두 통과
+- [x] **Step 2: 실패 확인** — Run: `pnpm test test/tests/coop/coop-session.test.ts` / Expected: FAIL
+- [x] **Step 3: 구현**
+- [x] **Step 4: 전체 확인** — Run: `pnpm test test/tests/coop && pnpm typecheck && pnpm biome:ci && pnpm exec ls-lint && pnpm coop:server:test` / Expected: 모두 통과
 - [ ] **Step 5: 기존 테스트 회귀 확인** — Run: `pnpm test:silent` / Expected: 이 계획 전과 같은 결과(코어 변경이 없으므로 새 실패 없음)
-- [ ] **Step 6: 커밋** — `git commit -m "feat(coop): add session and ownership skeleton"`
+- [x] **Step 6: 커밋** — `git commit -m "feat(coop): add session and ownership skeleton"`
+
+---
+
+## 구현 메모 (계획과 달라진 점)
+
+구현하면서 계획과 다르게 정한 부분이다. 2번 계획은 이 내용을 기준으로 작성한다.
+
+1. **버퍼링 규칙 확장**: "첫 핸들러 등록 전까지"가 아니라 "구독 중인 핸들러가 하나도 없는 동안" 도착한 메시지를 버퍼에 쌓는다. 핸드셰이크가 끝나 구독을 해제한 직후, 다음 구독자가 붙기 전에 상대가 보낸 메시지(예: `starters`)를 잃지 않기 위해서다. 공통 처리는 `CoopTransportListeners`(`src/coop/coop-transport.ts`)에 있다.
+2. **Loopback close 순서**: `close()` 시 상대에게 가는 `"closed"` 알림은 이미 보낸 메시지 뒤에 도착한다(실제 네트워크와 같은 순서). 그래서 상대 상태 변화는 `close()` 직후 동기적으로 보이지 않고 마이크로태스크 뒤에 보인다.
+3. **중계 서버가 `relay:` 프레임을 걸러냄**: 클라이언트가 보낸 프레임의 `t`가 `relay:`로 시작하면 상대에게 전달하지 않는다. 상대가 제어 메시지를 위조하지 못하게 하려는 것이다. 그 외 프레임은 그대로 전달한다.
+4. **재접속 중 `full` 오류는 재시도**: 서버가 이전 소켓의 끊김을 아직 감지하지 못하면 재입장이 `full`로 거절될 수 있으므로, 재접속 중에는 `full`이면 계속 재시도한다. `notFound`면 방이 만료된 것이므로 즉시 `"closed"`.
+5. **끊긴 동안 보낸 메시지는 버린다**: `RelayWebSocketTransport.send`는 소켓이 열려 있지 않으면 메시지를 버린다. 재접속 후 상태 맞추기는 6번 계획(세이브와 재접속)에서 다룬다.
+6. **`coop-server` 설치**: 루트 `pnpm-workspace.yaml` 때문에 `pnpm --dir coop-server install`이 루트를 설치하는 문제가 있어, `coop-server/pnpm-workspace.yaml`(`minimumReleaseAge` 포함)을 두어 독립 워크스페이스로 만들었다. 타입 검사용 `coop-server/tsconfig.json`과 루트 스크립트 `coop:server:typecheck`를 추가했다.
+7. **lint 예외**: 루트 biome가 `node:test` import를 막으므로 서버 테스트 두 파일에 사유를 단 `biome-ignore`를 붙였다(`biome.jsonc`는 그대로). `.ls-lint.yml` ignore에 `coop-server/node_modules`를 추가했다.
+8. **Node 버전**: 이 작업 환경은 Node 22.22였고, 22.18부터 타입 제거 실행이 기본이라 서버와 테스트가 그대로 동작했다. `engines`는 계획대로 `>=24`다.
