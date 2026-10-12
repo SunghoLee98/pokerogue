@@ -54,6 +54,12 @@ const COOP_TEXT = {
   notEnoughMoney: { en: "You don't have enough money.", ko: "돈이 부족합니다." },
   partnerPingedOption: { en: "Your partner suggests: {{option}}", ko: "파트너: {{option}} 골라줘!" },
   partnerPingedEncounter: { en: "Your partner suggests option {{option}}!", ko: "파트너: {{option}}번 선택지 골라줘!" },
+  ownerAsk: {
+    en: "Your partner wants to use {{pokemonName}}. Allow it?",
+    ko: "파트너가 {{pokemonName}}을(를) 고르려 합니다. 허락할까요?",
+  },
+  waitingForOwner: { en: "Waiting for your partner to allow it...", ko: "파트너의 허락을 기다리는 중..." },
+  ownerDeclined: { en: "Your partner did not allow it.", ko: "파트너가 허락하지 않았습니다." },
   partnerPinged: { en: "Your partner suggests this one!", ko: "파트너: 이거 골라줘!" },
   fleeDeclined: { en: "Your partner did not agree to flee.", ko: "파트너가 도망에 동의하지 않았습니다." },
 } as const satisfies Record<string, { en: string; ko: string }>;
