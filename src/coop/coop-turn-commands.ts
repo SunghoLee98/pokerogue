@@ -227,7 +227,7 @@ function awaitPartnerCommand(session: CoopSession, phase: CommandPhase, state: C
           return;
         }
         applyPartnerCommand(message.command);
-        globalScene.ui.clearText();
+        globalScene.ui.showText("", 0);
         if (localRun !== undefined) {
           // Both run: one attempt for the team.
           const { turnCommands } = globalScene.currentBattle;
