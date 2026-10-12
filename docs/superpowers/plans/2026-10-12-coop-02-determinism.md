@@ -276,3 +276,4 @@ test/utils/
 10. **로컬 테스트 환경**: 작업 환경에 `assets` 서브모듈이 없어 처음에는 GameManager 테스트가 전부 실패했다. `pokerogue-assets`의 해당 커밋에서 JSON 파일만(루트 JSON, `battle-anims/`, 변종 마스터리스트, 933개) 희소 체크아웃해 `assets/`에 두니 GameManager 테스트가 로컬에서 돌았다(이미지가 필요한 `test/tests/pokemon/pokemon-sprite.test.ts` 8개만 실패). 저장소에는 커밋하지 않았다.
 11. **세션에는 스냅샷이 반드시 있어야 한다**: Task 3 이후 협동 세션이 있으면 적 생성(`trySetShiny`)부터 호스트 스냅샷을 읽는다. Task 1의 호출 지점 테스트가 스냅샷 없는 세션을 만들어 GTS 테스트가 `missing co-op account snapshot for host`로 멈췄고, 테스트 세션에 빈 스냅샷을 넣어 고쳤다. 3단계에서 세션을 시작하는 경로는 `setCoopSession` 전에 두 스냅샷을 모두 넣어야 한다.
 12. **회귀 확인 (로컬)**: 전체 `pnpm test:silent`를 위 10번의 JSON 전용 assets로 돌렸다. 11번 수정 전 결과는 테스트 파일 463개 통과·2개 실패·8개 건너뜀, 테스트 3166개 통과·9개 실패였고, 실패는 `pokemon-sprite.test.ts` 8개(이미지 없음, 환경 문제)와 11번의 테스트 1개였다. 11번 수정 후 `test/tests/coop` 12개 파일 74개 테스트가 모두 통과했다. 최종 확인은 GitHub Actions `Tests` 워크플로우로 한다.
+13. **회귀 확인 (CI)**: GitHub Actions `Tests` 워크플로우(run 38220908975, 커밋 d746852)에서 테스트 파일 465개 통과·8개 건너뜀, 테스트 3175개 통과·실패 0으로 확인했다.
