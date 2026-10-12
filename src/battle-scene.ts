@@ -28,6 +28,7 @@ import { TurnCommandManager } from "#app/turn-command-manager";
 import { UiInputs } from "#app/ui-inputs";
 import { STARTING_WAVE } from "#balance/misc";
 import { FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
+import { coopForcesDouble } from "#coop/coop-battle-rules";
 import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets } from "#data/battle-anims";
 import { getDailyMysteryEncounter } from "#data/daily-run";
 import { allMoves, biomeDepths, modifierTypes } from "#data/data-lists";
@@ -1486,6 +1487,9 @@ export class BattleScene extends SceneBase {
     const doubleBattleOverride = this.doCheckDoubleOverride(waveIndex);
     if (doubleBattleOverride != null) {
       return doubleBattleOverride;
+    }
+    if (coopForcesDouble()) {
+      return true;
     }
 
     // Edge cases

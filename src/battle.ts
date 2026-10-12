@@ -2,6 +2,7 @@ import { DAILY_BOSS_LEVEL } from "#app/constants";
 import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
+import { getCoopWildEnemyCount } from "#coop/coop-battle-rules";
 import { coopRandInt } from "#coop/coop-random";
 import { isDailyFinalBoss } from "#data/daily-seed-utils";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -123,7 +124,7 @@ export class Battle {
       battleType === BattleType.TRAINER
         ? trainer?.getPartyLevels(this.waveIndex)
         : // TODO: Remove array.fill.map
-          new Array(double ? 2 : 1).fill(null).map(() => this.getLevelForWave());
+          new Array(getCoopWildEnemyCount(gameMode, waveIndex, double)).fill(null).map(() => this.getLevelForWave());
   }
 
   public get isClassicFinalBoss(): boolean {

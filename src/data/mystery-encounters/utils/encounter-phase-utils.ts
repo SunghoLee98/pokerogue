@@ -5,6 +5,7 @@ import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { BASE_HIDDEN_ABILITY_RATE, BASE_SHINY_CHANCE } from "#balance/rates";
+import { getCoopEncounterDouble } from "#coop/coop-battle-rules";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { modifierTypes } from "#data/data-lists";
 import type { IEggOptions } from "#data/egg";
@@ -191,7 +192,7 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
     enemyPokemon.leaveField(true, true, true);
   });
   battle.enemyParty = [];
-  battle.double = doubleBattle;
+  battle.double = getCoopEncounterDouble(doubleBattle);
 
   // ME levels are modified by an additive value that scales with wave index
   // Base scaling: Every 10 waves, modifier gets +1 level
