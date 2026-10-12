@@ -2,6 +2,7 @@ import { DAILY_BOSS_LEVEL } from "#app/constants";
 import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
+import { coopRandInt } from "#coop/coop-random";
 import { isDailyFinalBoss } from "#data/daily-seed-utils";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
@@ -27,7 +28,6 @@ import type { TurnMove } from "#types/turn-move";
 import {
   isBetween,
   NumberHolder,
-  randInt,
   randomString,
   randSeedFloat,
   randSeedInt,
@@ -589,7 +589,7 @@ export function getRandomTrainerFunc(
 
     let trainerGender = TrainerVariant.DEFAULT;
     if (randomGender) {
-      trainerGender = randInt(2) === 0 ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT;
+      trainerGender = coopRandInt(2) === 0 ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT;
     }
 
     /* 1/3 chance for evil team grunts to be double battles */
@@ -608,7 +608,7 @@ export function getRandomTrainerFunc(
     const isEvilTeamGrunt = evilTeamGrunts.includes(choice);
 
     if (trainerConfigs[choice].hasDouble && isEvilTeamGrunt) {
-      return new Trainer(choice, randInt(3) === 0 ? TrainerVariant.DOUBLE : trainerGender);
+      return new Trainer(choice, coopRandInt(3) === 0 ? TrainerVariant.DOUBLE : trainerGender);
     }
 
     return new Trainer(choice, trainerGender);
