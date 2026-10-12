@@ -1,6 +1,7 @@
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { queueCoopFieldSummons } from "#coop/coop-field";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
@@ -412,6 +413,12 @@ export class MysteryEncounterBattlePhase extends Phase {
       if (ivScannerModifier) {
         enemyField.map(p => globalScene.phaseManager.pushNew("ScanIvsPhase", p.getBattlerIndex()));
       }
+    }
+
+    if (queueCoopFieldSummons()) {
+      globalScene.phaseManager.pushNew("InitEncounterPhase");
+      this.end();
+      return;
     }
 
     const availablePartyMembers = globalScene.getPlayerParty().filter(p => p.isAllowedInBattle());

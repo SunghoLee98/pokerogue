@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { routeCoopSwitch } from "#coop/coop-field";
 import { PartyUiMode } from "#enums/party-ui-mode";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
@@ -67,17 +68,22 @@ export class SwitchPhase extends BattlePhase {
         ? this.fieldIndex
         : 0;
 
+    const select = routeCoopSwitch(this.fieldIndex, (slotIndex: number, option: PartyOption) => {
+      if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
+        const switchType = option === PartyOption.PASS_BATON ? SwitchType.BATON_PASS : this.switchType;
+        globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
+      }
+      globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+    });
+    if (!select) {
+      return;
+    }
+
     globalScene.ui.setMode(
       UiMode.PARTY,
       this.isModal ? PartyUiMode.FAINT_SWITCH : PartyUiMode.POST_BATTLE_SWITCH,
       fieldIndex,
-      (slotIndex: number, option: PartyOption) => {
-        if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
-          const switchType = option === PartyOption.PASS_BATON ? SwitchType.BATON_PASS : this.switchType;
-          globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
-        }
-        globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
-      },
+      select,
       PartyUiHandler.FilterNonFainted,
     );
   }

@@ -3,6 +3,7 @@ import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { FRIENDSHIP_LOSS_FROM_FAINT } from "#balance/starters";
+import { filterCoopReplacements } from "#coop/coop-field";
 import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
@@ -159,7 +160,10 @@ export class FaintPhase extends PokemonPhase {
       /** The total number of Pokemon in the player's party that can legally fight */
       const legalPlayerPokemon = globalScene.getPokemonAllowedInBattle();
       /** The total number of legal player Pokemon that aren't currently on the field */
-      const legalPlayerPartyPokemon = legalPlayerPokemon.filter(p => !p.isActive(true));
+      const legalPlayerPartyPokemon = filterCoopReplacements(
+        pokemon,
+        legalPlayerPokemon.filter(p => !p.isActive(true)),
+      );
       if (legalPlayerPokemon.length === 0) {
         /** If the player doesn't have any legal Pokemon, end the game */
         globalScene.phaseManager.unshiftNew("GameOverPhase");

@@ -6,6 +6,7 @@ import { settings } from "#app/global-settings-manager";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { activeOverrides } from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
+import { queueCoopFieldSummons } from "#coop/coop-field";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { getNatureName } from "#data/nature";
@@ -575,7 +576,7 @@ export class EncounterPhase extends BattlePhase {
       }
     }
 
-    if (!this.loaded) {
+    if (!this.loaded && !queueCoopFieldSummons()) {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle();
 
       if (!availablePartyMembers[0].isOnField()) {
