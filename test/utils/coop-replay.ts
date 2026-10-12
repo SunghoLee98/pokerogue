@@ -127,11 +127,11 @@ export async function startCoopBattle(game: GameManager, options: CoopBattleStar
   }
 
   const transport = options.transport ?? createLoopbackPair()[options.role];
-  game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+  game.onNextPrompt("TitlePhase", UiMode.TITLE, async () => {
     game.scene.gameMode = createCoopGameMode();
     const selectStarterPhase = new SelectStarterPhase();
     game.scene.phaseManager.pushNew("EncounterPhase", false);
-    startCoopRun(options.role, transport, options.start, () => selectStarterPhase.initBattle([]));
+    await startCoopRun(options.role, transport, options.start, () => selectStarterPhase.initBattle([]));
   });
 
   await game.phaseInterceptor.to("EncounterPhase");
