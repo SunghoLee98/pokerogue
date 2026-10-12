@@ -3,6 +3,8 @@ import { audioManager } from "#app/global-audio-manager";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
+import { isCoopBallUnavailable } from "#coop/coop-ball";
+import { getCaptureSimData } from "#coop/coop-capture";
 import { SubstituteTag } from "#data/battler-tags";
 import { Gender } from "#data/gender";
 import {
@@ -34,13 +36,16 @@ import i18next from "i18next";
 export class AttemptCapturePhase extends PokemonPhase {
   public readonly phaseName = "AttemptCapturePhase";
   private readonly pokeballType: PokeballType;
+  /** The `id` of the player pokemon that threw the ball, if known */
+  private readonly throwerId: number | undefined;
   private pokeball: Phaser.GameObjects.Sprite;
   private originalY: number;
 
-  constructor(targetIndex: number, pokeballType: PokeballType) {
+  constructor(targetIndex: number, pokeballType: PokeballType, throwerId?: number) {
     super(BattlerIndex.ENEMY + targetIndex);
 
     this.pokeballType = pokeballType;
+    this.throwerId = throwerId;
   }
 
   start() {
@@ -48,7 +53,7 @@ export class AttemptCapturePhase extends PokemonPhase {
 
     const pokemon = this.getPokemon() as EnemyPokemon;
 
-    if (!pokemon?.hp) {
+    if (!pokemon?.hp || isCoopBallUnavailable(this.pokeballType)) {
       return this.end();
     }
 
@@ -71,7 +76,7 @@ export class AttemptCapturePhase extends PokemonPhase {
       (((_3m - _2h) * catchRate * pokeballMultiplier) / _3m) * statusMultiplier * shinyMultiplier,
     );
     const shakeProbability = Math.round(65536 / Math.pow(255 / modifiedCatchRate, 0.1875)); // Formula taken from gen 6
-    const criticalCaptureChance = getCriticalCaptureChance(modifiedCatchRate);
+    const criticalCaptureChance = getCriticalCaptureChance(modifiedCatchRate, getCaptureSimData(this.throwerId));
 
     if ((isBeta || isDev) && !IS_TEST) {
       console.log(

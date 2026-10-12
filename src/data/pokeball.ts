@@ -87,13 +87,14 @@ export function getPokeballTintColor(type: PokeballType): number {
  * Gets the critical capture chance based on number of mons registered in Dex and modified {@link https://bulbapedia.bulbagarden.net/wiki/Catch_rate Catch rate}
  * Formula from {@link https://www.dragonflycave.com/mechanics/gen-vi-vii-capturing Dragonfly Cave Gen 6 Capture Mechanics page}
  * @param modifiedCatchRate the modified catch rate as calculated in {@linkcode AttemptCapturePhase}
+ * @param account - Whose dex counts: the thrower's in co-op, the world data (the local account in solo) by default
  * @returns the chance of getting a critical capture, out of 256
  */
-export function getCriticalCaptureChance(modifiedCatchRate: number): number {
+export function getCriticalCaptureChance(modifiedCatchRate: number, account = getWorldSimData()): number {
   if (globalScene.gameMode.isFreshStartChallenge()) {
     return 0;
   }
-  const dexCount = getWorldSimData().getCaughtSpeciesCount();
+  const dexCount = account.getCaughtSpeciesCount();
   const catchingCharmMultiplier = new NumberHolder(1);
   globalScene.findModifier(m => m.is("CriticalCatchChanceBoosterModifier"))?.apply(catchingCharmMultiplier);
   const dexMultiplier =

@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { applyCoopBallTarget, getCoopBallTargetPokemon, openCoopBallTargetSelect } from "#coop/coop-ball";
 import {
   coopBlocksCommandCancel,
   coopKeepsAllyCommand,
@@ -420,16 +421,21 @@ export class CommandPhase extends FieldPhase {
    * @returns Whether the command was successfully initiated
    */
   private handleBallCommand(cursor: number): boolean {
-    const targets = globalScene
-      .getEnemyField()
-      .filter(p => p.isActive(true))
-      .map(p => p.getBattlerIndex());
+    const targets = applyCoopBallTarget(
+      globalScene
+        .getEnemyField()
+        .filter(p => p.isActive(true))
+        .map(p => p.getBattlerIndex()),
+    );
 
     if (!this.checkCanUseBall()) {
       return false;
     }
 
     if (targets.length > 1) {
+      if (openCoopBallTargetSelect(this, cursor)) {
+        return false;
+      }
       this.queueShowText("battle:noPokeballMulti");
       return false;
     }
@@ -440,7 +446,7 @@ export class CommandPhase extends FieldPhase {
 
     const numBallTypes = 5;
     if (cursor < numBallTypes) {
-      const targetPokemon = globalScene.getEnemyPokemon(false);
+      const targetPokemon = getCoopBallTargetPokemon(targets) ?? globalScene.getEnemyPokemon(false);
       if (
         targetPokemon?.isBoss()
         && targetPokemon?.bossSegmentIndex >= 1 // TODO: Decouple this hardcoded exception for wonder guard and just check the target...

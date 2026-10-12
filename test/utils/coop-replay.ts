@@ -12,6 +12,7 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { activeOverrides } from "#app/overrides";
+import { withCoopBallTarget } from "#coop/coop-ball";
 import type { CoopChecksum } from "#coop/coop-desync";
 import { createCoopGameMode, startCoopRun } from "#coop/coop-game-start";
 import type {
@@ -44,7 +45,12 @@ import { SelectStarterPhase } from "#phases/select-starter-phase";
 import type { GameData } from "#system/game-data";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
-import { CoopTestPartner, synthesizeMoveCommand, synthesizeRunCommand } from "#test/utils/coop-partner";
+import {
+  CoopTestPartner,
+  synthesizeBallCommand,
+  synthesizeMoveCommand,
+  synthesizeRunCommand,
+} from "#test/utils/coop-partner";
 import type { ConfirmUiHandler } from "#ui/confirm-ui-handler";
 import { getEnumValues } from "#utils/enums";
 import { vi } from "vitest";
@@ -52,11 +58,13 @@ import { vi } from "vitest";
 /**
  * One input a player makes for their own field slot in a turn.
  * - `move`: a move in the moveset, with a target if the move asks for one
+ * - `ball`: a ball thrown at an enemy
  * - `run`: run away (a flee proposal while the partner has not run too)
  * - `fleeAnswer`: the answer to the partner's flee proposal (accepting runs too)
  */
 export type CoopReplayAction =
   | { kind: "move"; moveId: MoveId; target?: BattlerIndex }
+  | { kind: "ball"; ball: PokeballType; target: BattlerIndex }
   | { kind: "run" }
   | { kind: "fleeAnswer"; accept: boolean };
 
@@ -323,6 +331,8 @@ function synthesizeMessages(by: CoopRole, actions: CoopReplayAction[]): CoopMess
     switch (action.kind) {
       case "move":
         return command(synthesizeMoveCommand(fieldIndex, action.moveId, action.target));
+      case "ball":
+        return command(synthesizeBallCommand(fieldIndex, action.ball, action.target));
       case "run":
         return command(synthesizeRunCommand(fieldIndex));
       case "fleeAnswer":
@@ -340,6 +350,11 @@ function queueLocalActions(game: GameManager, role: CoopRole, actions: CoopRepla
     switch (action.kind) {
       case "move":
         game.move.select(action.moveId, FIELD_BY_ROLE[role], action.target);
+        break;
+      case "ball":
+        game.onNextPrompt("CommandPhase", UiMode.COMMAND, () => {
+          withCoopBallTarget(action.target, () => commandPhase().handleCommand(Command.BALL, action.ball));
+        });
         break;
       case "run":
         game.onNextPrompt("CommandPhase", UiMode.COMMAND, () => {
