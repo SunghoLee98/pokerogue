@@ -10,6 +10,7 @@ import {
   type CoopReplayLog,
   type CoopTestAccount,
   createFreshGameManager,
+  inputsBy,
   runCoopReplay,
 } from "#test/utils/coop-replay";
 import Phaser from "phaser";
@@ -32,7 +33,7 @@ function attack(game: GameManager, moveId: MoveId, preferred: BattlerIndex.ENEMY
     const [first, second] = game.scene.getEnemyField();
     const slots = preferred === BattlerIndex.ENEMY ? [first, second] : [second, first];
     const target = slots.find(p => p && !p.isFainted()) ?? slots[0];
-    return { moveId, target: target.getBattlerIndex() };
+    return { kind: "move" as const, moveId, target: target.getBattlerIndex() };
   }) satisfies CoopReplayCommandFn;
 }
 
@@ -133,7 +134,8 @@ describe("co-op desync replay", () => {
     const guestLog = await replayGuest(hostLog, guestAccount);
 
     expect(findFirstDesync(hostLog.checksums, guestLog.checksums)).toBeNull();
-    expect(guestLog.inputs).toEqual(hostLog.inputs);
+    expect(inputsBy(guestLog, "guest")).toEqual(inputsBy(hostLog, "guest"));
+    expect(inputsBy(guestLog, "host")).toEqual(inputsBy(hostLog, "host"));
   });
 
   it("detects a divergence injected through wrong world data", async () => {

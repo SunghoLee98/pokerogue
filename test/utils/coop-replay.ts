@@ -8,12 +8,19 @@
  * @module
  */
 
+import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { activeOverrides } from "#app/overrides";
 import type { CoopChecksum } from "#coop/coop-desync";
 import { createCoopGameMode, startCoopRun } from "#coop/coop-game-start";
-import type { CoopAccountSnapshot, CoopRole, CoopStarterPayload } from "#coop/coop-protocol";
+import type {
+  CoopAccountSnapshot,
+  CoopMessage,
+  CoopRole,
+  CoopStarterPayload,
+  CoopTurnCommandPayload,
+} from "#coop/coop-protocol";
 import { setCoopSession } from "#coop/coop-session";
 import { createAccountSnapshot } from "#coop/coop-sim-data";
 import { CoopStarterSelection, type CoopStartInfo } from "#coop/coop-starter-selection";
@@ -23,6 +30,8 @@ import { createLoopbackPair } from "#coop/loopback-transport";
 import { Gender } from "#data/gender";
 import { BattleStyle } from "#enums/battle-style";
 import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
+import { Command } from "#enums/command";
 import { DexAttr } from "#enums/dex-attr";
 import { MoveId } from "#enums/move-id";
 import { Nature } from "#enums/nature";
@@ -30,24 +39,33 @@ import { PokeballType } from "#enums/pokeball";
 import type { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { Unlockables } from "#enums/unlockables";
+import type { CommandPhase } from "#phases/command-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import type { GameData } from "#system/game-data";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
-import { CoopTestPartner, synthesizeMoveCommand } from "#test/utils/coop-partner";
+import { CoopTestPartner, synthesizeMoveCommand, synthesizeRunCommand } from "#test/utils/coop-partner";
+import type { ConfirmUiHandler } from "#ui/confirm-ui-handler";
 import { getEnumValues } from "#utils/enums";
 import { vi } from "vitest";
 
-/** One player's battle command for their own field slot. */
-export interface CoopReplayCommand {
-  moveId: MoveId;
-  target: BattlerIndex;
-}
+/**
+ * One input a player makes for their own field slot in a turn.
+ * - `move`: a move in the moveset, with a target if the move asks for one
+ * - `run`: run away (a flee proposal while the partner has not run too)
+ * - `fleeAnswer`: the answer to the partner's flee proposal (accepting runs too)
+ */
+export type CoopReplayAction =
+  | { kind: "move"; moveId: MoveId; target?: BattlerIndex }
+  | { kind: "run" }
+  | { kind: "fleeAnswer"; accept: boolean };
 
-export interface CoopReplayInput extends CoopReplayCommand {
+/** A message one player's client sent, filed under the battle turn it was sent in. */
+export interface CoopReplayInput {
   by: CoopRole;
   wave: number;
   turn: number;
+  message: CoopMessage;
 }
 
 export interface CoopReplayLog {
@@ -70,7 +88,8 @@ export interface CoopTestAccount {
   eggMoves: Partial<Record<SpeciesId, number>>;
 }
 
-export type CoopReplayCommandFn = (wave: number, turn: number) => CoopReplayCommand;
+/** A player's inputs for a turn, in the order they make them (for example a declined flee, then a move). */
+export type CoopReplayCommandFn = (wave: number, turn: number) => CoopReplayAction | CoopReplayAction[];
 
 export interface CoopReplayOptions {
   /** The role this run plays */
@@ -84,8 +103,12 @@ export interface CoopReplayOptions {
   worldDataOverride?: CoopAccountSnapshot;
   /** The two starters: index 0 belongs to the host, index 1 to the guest */
   species: [SpeciesId, SpeciesId];
-  /** Number of waves to clear */
+  /** Further starters of each player, after the first */
+  benches?: Partial<Record<CoopRole, SpeciesId[]>>;
+  /** Number of waves to finish (by winning, catching everything or fleeing) */
   waves: number;
+  /** Stop after this many turns even if the waves are not finished */
+  turns?: number;
   /** The shared seed; both runs must use the same one. Default `"coop-replay"` */
   seed?: string;
 }
@@ -244,14 +267,6 @@ export function applyTestAccount(gameData: GameData, account: CoopTestAccount): 
   }
 }
 
-function findRecordedCommand(log: CoopReplayLog, by: CoopRole, wave: number, turn: number): CoopReplayCommand {
-  const input = log.inputs.find(i => i.by === by && i.wave === wave && i.turn === turn);
-  if (!input) {
-    throw new Error(`no recorded ${by} input for wave ${wave} turn ${turn}`);
-  }
-  return { moveId: input.moveId, target: input.target };
-}
-
 /**
  * Make the local game data the role's account.
  * @returns Both players' account snapshots
@@ -294,42 +309,87 @@ export function createTestStarterPayload(speciesId: SpeciesId): CoopStarterPaylo
   };
 }
 
-/** Select both players' commands for the current turn, recording them. */
-function selectCommands(
-  game: GameManager,
-  options: CoopReplayOptions,
-  log: CoopReplayLog,
-  partner: CoopTestPartner,
-): void {
-  const { role, localCommand, remote } = options;
-  const { waveIndex: wave, turn } = game.scene.currentBattle;
-  for (const by of ["host", "guest"] as const) {
-    let command: CoopReplayCommand;
-    if (by === role) {
-      command = localCommand(wave, turn);
-    } else if ("log" in remote) {
-      command = findRecordedCommand(remote.log, by, wave, turn);
-    } else {
-      command = remote.command(wave, turn);
+/** The messages a player's client sends for their actions, as its `CommandPhase` and flee prompt would. */
+function synthesizeMessages(by: CoopRole, actions: CoopReplayAction[]): CoopMessage[] {
+  const { waveIndex: wave, turn } = globalScene.currentBattle;
+  const fieldIndex = FIELD_BY_ROLE[by];
+  const command = (payload: CoopTurnCommandPayload): CoopMessage => ({
+    t: "turnCommand",
+    wave,
+    turn,
+    command: payload,
+  });
+  return actions.map(action => {
+    switch (action.kind) {
+      case "move":
+        return command(synthesizeMoveCommand(fieldIndex, action.moveId, action.target));
+      case "run":
+        return command(synthesizeRunCommand(fieldIndex));
+      case "fleeAnswer":
+        return action.accept
+          ? command(synthesizeRunCommand(fieldIndex))
+          : { t: "confirm", kind: "flee", wave, turn, accepted: false };
     }
-    log.inputs.push({ by, wave, turn, ...command });
-    if (by === role) {
-      game.move.select(command.moveId, FIELD_BY_ROLE[by], command.target);
-    } else {
-      // The partner's client is not running: send what it would send for its own slot.
-      partner.sendCommand(synthesizeMoveCommand(FIELD_BY_ROLE[by], command.moveId, command.target));
+  });
+}
+
+/** Queue the local player's actions as UI inputs, in order. */
+function queueLocalActions(game: GameManager, role: CoopRole, actions: CoopReplayAction[]): void {
+  const commandPhase = () => game.scene.phaseManager.getCurrentPhase() as CommandPhase;
+  for (const action of actions) {
+    switch (action.kind) {
+      case "move":
+        game.move.select(action.moveId, FIELD_BY_ROLE[role], action.target);
+        break;
+      case "run":
+        game.onNextPrompt("CommandPhase", UiMode.COMMAND, () => {
+          commandPhase().handleCommand(Command.RUN, 0);
+        });
+        break;
+      case "fleeAnswer":
+        game.onNextPrompt("CommandPhase", UiMode.CONFIRM, () => {
+          const handler = game.scene.ui.getHandler() as ConfirmUiHandler;
+          handler.setCursor(action.accept ? 0 : 1);
+          handler.processInput(Button.ACTION);
+        });
+        break;
     }
   }
 }
 
 /**
+ * Make both players' inputs for the current turn.
+ * The local player's go through the UI. The partner's client is not running, so the messages it would send go out
+ * over the connection instead: made up from its actions when recording, or taken from the log when replaying.
+ */
+function inputTurn(game: GameManager, options: CoopReplayOptions, log: CoopReplayLog, partner: CoopTestPartner): void {
+  const { role, localCommand, remote } = options;
+  const by: CoopRole = role === "host" ? "guest" : "host";
+  const { waveIndex: wave, turn } = game.scene.currentBattle;
+  const remoteMessages =
+    "log" in remote
+      ? remote.log.inputs.filter(i => i.by === by && i.wave === wave && i.turn === turn).map(i => i.message)
+      : synthesizeMessages(by, [remote.command(wave, turn)].flat());
+  for (const message of remoteMessages) {
+    log.inputs.push({ by, wave, turn, message });
+    partner.send(message);
+  }
+  queueLocalActions(game, role, [localCommand(wave, turn)].flat());
+}
+
+/** The inputs one player made, in order. */
+export function inputsBy(log: CoopReplayLog, role: CoopRole): CoopReplayInput[] {
+  return log.inputs.filter(i => i.by === role);
+}
+
+/**
  * Play a co-op game as one role, recording inputs and state hashes at the start of every wave and the end of every turn.
- * Overrides: double battles, level 100 players, enemies that only use Splash, no trainer waves,
+ * Co-op makes every battle double. Overrides: level 100 players, enemies that only use Splash, no trainer waves,
  * and real shiny rolls for enemies (so the trainer id matters).
  */
 export async function runCoopReplay(game: GameManager, options: CoopReplayOptions): Promise<CoopReplayLog> {
   game.override.disableShinies = false;
-  game.override.battleStyle("double").startingLevel(100).enemyMoveset(MoveId.SPLASH).disableTrainerWaves();
+  game.override.startingLevel(100).enemyMoveset(MoveId.SPLASH).disableTrainerWaves();
   game.override.shiny(false);
 
   const snapshots = prepareAccounts(game, options);
@@ -337,13 +397,25 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
     seed: options.seed ?? "coop-replay",
     accounts: { host: options.worldDataOverride ?? snapshots.host, guest: snapshots.guest },
     picks: {
-      host: [createTestStarterPayload(options.species[0])],
-      guest: [createTestStarterPayload(options.species[1])],
+      host: [options.species[0], ...(options.benches?.host ?? [])].map(createTestStarterPayload),
+      guest: [options.species[1], ...(options.benches?.guest ?? [])].map(createTestStarterPayload),
     },
     timedEvent: null,
   };
   const log: CoopReplayLog = { inputs: [], checksums: [], enemyIds: [], states: [] };
   const partner = new CoopTestPartner(options.role);
+  let read = 0;
+  /** File what the local client sent since the last call. */
+  const collectSent = () => {
+    for (const message of partner.received.slice(read)) {
+      if (message.t === "turnCommand" || message.t === "confirm" || message.t === "choice") {
+        const { waveIndex, turn } = game.scene.currentBattle;
+        const at = "turn" in message ? { wave: message.wave, turn: message.turn } : { wave: waveIndex, turn };
+        log.inputs.push({ by: options.role, ...at, message });
+      }
+    }
+    read = partner.received.length;
+  };
   const checkpoint = () => {
     const { waveIndex, turn } = game.scene.currentBattle;
     const state = captureCoopState();
@@ -361,16 +433,28 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
     await startCoopBattle(game, { role: options.role, start, transport: partner.localTransport });
     waveStart();
 
-    let cleared = 0;
-    while (cleared < options.waves) {
-      selectCommands(game, options, log, partner);
+    let finished = 0;
+    let turns = 0;
+    while (finished < options.waves && turns < (options.turns ?? Number.POSITIVE_INFINITY)) {
+      inputTurn(game, options, log, partner);
       await game.toEndOfTurn();
+      // Let the last messages of the turn arrive before filing them.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      collectSent();
       checkpoint();
+      turns++;
 
-      if (!game.isVictory()) {
+      const fled = game.scene.currentBattle.successfulRun;
+      if (!fled && !game.isVictory()) {
         await game.toNextTurn();
-      } else if (++cleared < options.waves) {
-        await game.toNextWave();
+      } else if (++finished < options.waves) {
+        if (fled) {
+          // No rewards after fleeing.
+          await game.phaseInterceptor.to("TurnInitPhase");
+          await game.phaseInterceptor.to("CommandPhase");
+        } else {
+          await game.toNextWave();
+        }
         waveStart();
       }
     }
