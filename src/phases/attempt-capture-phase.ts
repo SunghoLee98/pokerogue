@@ -4,7 +4,12 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
 import { isCoopBallUnavailable } from "#coop/coop-ball";
-import { getCaptureSimData } from "#coop/coop-capture";
+import {
+  beginCoopCaptureDecision,
+  getCaptureSimData,
+  isCaptureRosterFull,
+  registerCoopCapture,
+} from "#coop/coop-capture";
 import { SubstituteTag } from "#data/battler-tags";
 import { Gender } from "#data/gender";
 import {
@@ -300,6 +305,7 @@ export class AttemptCapturePhase extends PokemonPhase {
         };
         const addToParty = (slotIndex?: number) => {
           const newPokemon = pokemon.addToParty(this.pokeballType, slotIndex);
+          registerCoopCapture(newPokemon, this.throwerId);
           const modifiers = globalScene.findModifiers(m => m instanceof PokemonHeldItemModifier, false);
           if (globalScene.getPlayerParty().filter(p => p.isShiny()).length === PLAYER_PARTY_MAX_SIZE) {
             globalScene.validateAchv(achvs.SHINY_PARTY);
@@ -321,7 +327,8 @@ export class AttemptCapturePhase extends PokemonPhase {
             end();
             return;
           }
-          if (globalScene.getPlayerParty().length === PLAYER_PARTY_MAX_SIZE) {
+          if (isCaptureRosterFull(this.throwerId)) {
+            const coopDecision = beginCoopCaptureDecision(this.throwerId);
             const addToPartyMenuConfig: OptionSelectModeConfig = {
               options: [
                 {
@@ -377,6 +384,7 @@ export class AttemptCapturePhase extends PokemonPhase {
                       (slotIndex: number, _option: PartyOption) => {
                         ui.setMode(UiMode.MESSAGE).then(() => {
                           if (slotIndex < PLAYER_PARTY_MAX_SIZE) {
+                            coopDecision?.replaced(slotIndex);
                             addToParty(slotIndex);
                           } else {
                             promptRelease();
@@ -391,6 +399,7 @@ export class AttemptCapturePhase extends PokemonPhase {
                   label: i18next.t("menu:no"),
                   handler: () => {
                     ui.setMode(UiMode.MESSAGE).then(() => {
+                      coopDecision?.keptOut();
                       removePokemon();
                       end();
                     });
@@ -408,7 +417,13 @@ export class AttemptCapturePhase extends PokemonPhase {
                 ui.setMode(UiMode.OPTION_SELECT, addToPartyMenuConfig);
               });
             };
-            promptRelease();
+            const keepOut = () => {
+              removePokemon();
+              end();
+            };
+            if (!coopDecision?.awaitThrower({ replace: addToParty, keepOut })) {
+              promptRelease();
+            }
           } else {
             addToParty();
           }

@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { wrapCoopPartyFilter } from "#coop/coop-field";
 import { allMoves } from "#data/data-lists";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
@@ -283,8 +284,10 @@ export class PartyUiHandler extends MessageUiHandler {
     this.fieldIndex = args.length > 1 ? (args[1] as number) : -1;
 
     this.selectCallback = args.length > 2 && args[2] instanceof Function ? args[2] : undefined;
-    this.selectFilter =
-      args.length > 3 && args[3] instanceof Function ? (args[3] as PokemonSelectFilter) : PartyUiHandler.FilterAll;
+    this.selectFilter = wrapCoopPartyFilter(
+      this.partyUiMode,
+      args.length > 3 && args[3] instanceof Function ? (args[3] as PokemonSelectFilter) : PartyUiHandler.FilterAll,
+    );
     this.moveSelectFilter =
       args.length > 4 && args[4] instanceof Function
         ? (args[4] as PokemonMoveSelectFilter)

@@ -42,6 +42,11 @@ const COOP_TEXT = {
     en: "Your partner wants to flee.\nFlee together?",
     ko: "파트너가 도망치려 합니다.\n같이 도망칠까요?",
   },
+  waitingForPartnerChoice: { en: "Waiting for your partner to choose...", ko: "파트너가 고르는 중..." },
+  partnerPokemon: {
+    en: "{{pokemonName}} is your partner's Pokémon.",
+    ko: "{{pokemonName}}은(는) 파트너의 포켓몬입니다.",
+  },
   fleeDeclined: { en: "Your partner did not agree to flee.", ko: "파트너가 도망에 동의하지 않았습니다." },
 } as const satisfies Record<string, { en: string; ko: string }>;
 
