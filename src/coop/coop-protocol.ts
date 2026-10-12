@@ -3,6 +3,14 @@
  * @module
  */
 
+import type { Gender } from "#data/gender";
+import type { MoveId } from "#enums/move-id";
+import type { Nature } from "#enums/nature";
+import type { PokeballType } from "#enums/pokeball";
+import type { PokemonType } from "#enums/pokemon-type";
+import type { SpeciesId } from "#enums/species-id";
+import type { Variant } from "#sprites/variant";
+
 /** Bumped whenever a message shape changes incompatibly. Peers with different versions refuse to connect. */
 export const COOP_PROTOCOL_VERSION = 1;
 
@@ -27,17 +35,57 @@ export interface CoopAccountSnapshot {
 /** The host's world-level account data sent in the `start` message. */
 export type CoopWorldData = CoopAccountSnapshot;
 
+/**
+ * Everything needed to create one player's starter on both clients.
+ * Built by the owner from their own account; the peer creates the pokemon from this alone,
+ * so it holds every value that depends on the owner's account.
+ */
+export interface CoopStarterPayload {
+  speciesId: SpeciesId;
+  formIndex: number;
+  gender: Gender;
+  shiny: boolean;
+  variant: Variant;
+  abilityIndex: number;
+  passive: boolean;
+  nature: Nature;
+  ivs: number[];
+  /** Includes egg moves. Empty for the default moveset. */
+  moveset: MoveId[];
+  teraType: PokemonType;
+  friendship: number;
+  pokeball: PokeballType;
+  nickname?: string;
+  pokerus: boolean;
+  /** Luck from the owner's dex entry */
+  luck: number;
+}
+
 // Payloads below are narrowed by later co-op plans.
-export type CoopStarterPayload = Record<string, unknown>;
 export type TurnCommandPayload = Record<string, unknown>;
 export type CoopSessionSnapshot = Record<string, unknown>;
 export type CoopChoiceKind = string;
 
 export type CoopMessage =
   | { t: "hello"; gameVersion: string; protocol: number; accountName: string }
-  | { t: "starters"; picks: CoopStarterPayload[]; ready: boolean }
-  /** Sent by the host only. Carries a snapshot of the host's world-level account data. */
-  | { t: "start"; seed: string; hostWorldData: CoopWorldData }
+  /**
+   * A player's starter selection. `picks` is only filled while `ready` (only confirmed picks are shown to the peer).
+   * `account` is the sender's account snapshot, read for their pokemon once the run starts.
+   */
+  | { t: "starters"; picks: CoopStarterPayload[]; ready: boolean; account: CoopAccountSnapshot }
+  /**
+   * Sent by the host only, when both players are ready. Everything both clients need to create the same run:
+   * the shared seed, both account snapshots, both players' picks and the host's active timed event (`null` for none).
+   */
+  | {
+      t: "start";
+      seed: string;
+      hostWorldData: CoopWorldData;
+      guestAccount: CoopAccountSnapshot;
+      hostPicks: CoopStarterPayload[];
+      guestPicks: CoopStarterPayload[];
+      timedEvent: string | null;
+    }
   | { t: "turnCommand"; turn: number; wave: number; command: TurnCommandPayload }
   | { t: "choice"; kind: CoopChoiceKind; wave: number; payload: unknown }
   | { t: "ping"; kind: CoopChoiceKind; payload: unknown }
