@@ -10,7 +10,7 @@ import { globalScene } from "#app/global-scene";
 import { attachCoopChecksums } from "#coop/coop-checksum";
 import { type CoopConnection, type CoopLocalInfo, getLocalCoopInfo, hostCoop } from "#coop/coop-connect";
 import { watchCoopConnection } from "#coop/coop-exit";
-import { arrangeCoopParty } from "#coop/coop-field";
+import { arrangeCoopParty, queueCoopSwitchQuestions, soloAsksSwitch } from "#coop/coop-field";
 import { CoopOwnership } from "#coop/coop-ownership";
 import type { CoopRole } from "#coop/coop-protocol";
 import { restoreCoopRewardCounters } from "#coop/coop-reward";
@@ -58,8 +58,8 @@ export async function resumeCoopRun(role: CoopRole, transport: CoopTransport, se
 
 /**
  * Queue the summons after continuing a co-op run, in place of the title screen's solo summons:
- * each player's pokemon goes to their own slot (an empty slot for a wiped player), and there is no "switch?"
- * question (`CheckSwitchPhase`), which depends on each client's settings.
+ * each player's pokemon goes to their own slot (an empty slot for a wiped player), then each player is asked
+ * "switch?" about their own pokemon where solo would ask (see `takeOverCoopSwitchQuestion`).
  * @returns Whether co-op queued the summons (the caller must skip its own)
  */
 export function queueCoopResumeSummons(): boolean {
@@ -75,6 +75,9 @@ export function queueCoopResumeSummons(): boolean {
     if (fighter) {
       globalScene.phaseManager.pushNew("SummonPhase", fieldIndex, true, true);
     }
+  }
+  if (soloAsksSwitch()) {
+    queueCoopSwitchQuestions(fighters);
   }
   return true;
 }

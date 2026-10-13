@@ -4,6 +4,7 @@ import { submitCoopRewardAction } from "#coop/coop-reward";
 import { coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import { computeCoopStateHash } from "#coop/coop-state-hash";
+import { BattleStyle } from "#enums/battle-style";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
@@ -12,6 +13,7 @@ import type { TitlePhase } from "#phases/title-phase";
 import type { GameManager } from "#test/framework/game-manager";
 import { CoopTestPartner, synthesizeMoveCommand } from "#test/utils/coop-partner";
 import {
+  answerWaveStartSwitchPrompt,
   applyTestAccount,
   createFreshGameManager,
   createTestStarterPayload,
@@ -66,12 +68,28 @@ interface ResumedRun {
   hashes: string[];
   ownership: Record<number, CoopRole>;
   partyIds: number[];
+  fieldIds: number[];
   phases: string[];
+  /** The wave start switch answers the local client sent */
+  answers: unknown[];
+}
+
+interface ResumeOptions {
+  /** The local player's battle style */
+  style?: BattleStyle;
+  /** The party slot each player sends out when asked whether to switch after resuming; `null` to stay */
+  switchTo?: Partial<Record<CoopRole, number>>;
 }
 
 /** Resume the saved run on a fresh game as `role`, then play one turn of Splash on both sides. */
-async function resumeAs(game: GameManager, role: CoopRole, json: string): Promise<ResumedRun> {
+async function resumeAs(
+  game: GameManager,
+  role: CoopRole,
+  json: string,
+  { style = BattleStyle.SET, switchTo = {} }: ResumeOptions = {},
+): Promise<ResumedRun> {
   setUp(game);
+  game.settings.battleStyle(style);
   // Each client has its own account data.
   applyTestAccount(game.scene.gameData, {
     trainerId: role === "host" ? 1111 : 2222,
@@ -81,6 +99,8 @@ async function resumeAs(game: GameManager, role: CoopRole, json: string): Promis
     eggMoves: {},
   });
   const partner = new CoopTestPartner(role);
+  const partnerRole: CoopRole = role === "host" ? "guest" : "host";
+  partner.waveStartSwitch = () => switchTo[partnerRole] ?? null;
   await game.runToTitle();
   game.onNextPrompt("TitlePhase", UiMode.TITLE, async () => {
     const title = game.scene.phaseManager.getCurrentPhase() as TitlePhase;
@@ -88,6 +108,9 @@ async function resumeAs(game: GameManager, role: CoopRole, json: string): Promis
     title["loaded"] = true;
     title.end();
   });
+  if (style === BattleStyle.SWITCH) {
+    answerWaveStartSwitchPrompt(game, switchTo[role] ?? null);
+  }
   await game.phaseInterceptor.to("CommandPhase");
   const hashes = [computeCoopStateHash()];
 
@@ -100,7 +123,9 @@ async function resumeAs(game: GameManager, role: CoopRole, json: string): Promis
     hashes,
     ownership: coopSession!.ownership.toJSON(),
     partyIds: game.scene.getPlayerParty().map(p => p.id),
+    fieldIds: game.scene.getPlayerField().map(p => p.id),
     phases: [...game.phaseInterceptor.phaseLog],
+    answers: partner.received.flatMap(m => (m.t === "choice" && m.kind === "waveStartSwitch" ? [m.payload] : [])),
   };
 }
 
@@ -130,14 +155,42 @@ describe("resuming a saved co-op run", () => {
     expect(guest.partyIds).toEqual(host.partyIds);
   });
 
-  it("puts each player's pokemon in their own slot without asking to switch", async () => {
+  it("resumes into the same state with different battle styles and a switch by the guest", async () => {
+    const saved = await saveAtWaveTwo(createFreshGameManager(phaserGame));
+    const json = JSON.stringify(saved);
+    // The party is ordered host, guest, then the benches: Bulbasaur, Charmander, Pidgey, Rattata.
+    const switchTo = { guest: 3 };
+
+    const host = await resumeAs(createFreshGameManager(phaserGame), "host", json, {
+      style: BattleStyle.SWITCH,
+      switchTo,
+    });
+    setCoopSession(null);
+    const guest = await resumeAs(createFreshGameManager(phaserGame), "guest", json, {
+      style: BattleStyle.SWITCH,
+      switchTo,
+    });
+    setCoopSession(null);
+    const setGuest = await resumeAs(createFreshGameManager(phaserGame), "guest", json, { switchTo: {} });
+
+    expect(guest.hashes).toEqual(host.hashes);
+    expect(guest.partyIds).toEqual(host.partyIds);
+    expect(host.fieldIds).toEqual([saved.party[0].id, saved.party[3].id]);
+    expect(guest.answers).toEqual([{ kind: "waveStartSwitch", seq: saved.coop!.decisionSeq + 1, slotIndex: 3 }]);
+    // A guest playing "Set" is not asked and keeps its pokemon in.
+    expect(setGuest.fieldIds).toEqual([saved.party[0].id, saved.party[1].id]);
+    expect(setGuest.answers).toEqual([{ kind: "waveStartSwitch", seq: saved.coop!.decisionSeq + 1, slotIndex: -1 }]);
+  });
+
+  it("puts each player's pokemon in their own slot and asks each about their own", async () => {
     const saved = await saveAtWaveTwo(createFreshGameManager(phaserGame));
     const game = createFreshGameManager(phaserGame);
     const run = await resumeAs(game, "guest", JSON.stringify(saved));
 
     const field = game.scene.getPlayerField();
     expect(field.map(p => run.ownership[p.id])).toEqual(["host", "guest"]);
-    expect(run.phases).not.toContain("CheckSwitchPhase");
+    expect(run.phases.filter(p => p === "CheckSwitchPhase")).toHaveLength(2);
+    expect(run.answers).toHaveLength(1);
     expect(game.scene.gameMode.isCoop).toBe(true);
     expect(game.scene.sessionSlotId).toBe(5);
   });
