@@ -58,7 +58,7 @@ describe("co-op on the starter select screen", () => {
     await pair.host.host();
     await pair.guest.join("LOOP00");
     const lobby = openCoopLobby(
-      { role: "guest", transport: pair.guest, peerAccountName: "Hosty" },
+      { role: "guest", transport: pair.guest, peerAccountName: "Hosty", peerTrainerId: 0, peerResume: false },
       { getAccount: () => emptySnapshot },
     );
     const container = handler["starterSelectContainer"];

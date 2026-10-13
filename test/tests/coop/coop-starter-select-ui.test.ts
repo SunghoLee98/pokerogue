@@ -181,7 +181,7 @@ describe("co-op starter select phase", () => {
 
     const pair = await connectedPair();
     openCoopLobby(
-      { role: "guest", transport: pair.guest, peerAccountName: "Hosty" },
+      { role: "guest", transport: pair.guest, peerAccountName: "Hosty", peerTrainerId: 0, peerResume: false },
       { getAccount: () => emptySnapshot },
     );
     const controller = createCoopStarterSelectUi(container, layout, () => {});
@@ -212,7 +212,7 @@ describe("co-op starter select phase", () => {
     await game.runToTitle();
     const pair = await connectedPair();
     const lobby = openCoopLobby(
-      { role: "guest", transport: pair.guest, peerAccountName: "Hosty" },
+      { role: "guest", transport: pair.guest, peerAccountName: "Hosty", peerTrainerId: 0, peerResume: false },
       { getAccount: () => emptySnapshot },
     );
     const host = new CoopStarterSelection("host", pair.host, {

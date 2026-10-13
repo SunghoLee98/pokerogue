@@ -30,7 +30,8 @@ const pick = {
 describe("coop-protocol", () => {
   it("round-trips every message kind", () => {
     const messages: CoopMessage[] = [
-      { t: "hello", gameVersion: "1.12.1.0", protocol: COOP_PROTOCOL_VERSION, accountName: "a" },
+      { t: "hello", gameVersion: "1.12.1.0", protocol: COOP_PROTOCOL_VERSION, accountName: "a", trainerId: 5 },
+      { t: "hello", gameVersion: "1.12.1.0", protocol: 4, accountName: "a", trainerId: 5, resume: true },
       { t: "starters", picks: [pick], ready: true, account },
       {
         t: "start",
@@ -97,12 +98,26 @@ describe("coop-protocol", () => {
       { t: "choice", kind: "meOption", wave: 3, payload: { index: 1 } },
       { t: "confirm", kind: "flee", wave: 7, turn: 2, accepted: false },
       { t: "confirm", kind: "mePokemon", wave: 7, seq: 6, accepted: true },
-      { t: "resume", session: {} },
+      { t: "resume", session: '{"seed":"s","coop":{}}' },
       { t: "bye" },
+      { t: "bye", reason: "saveAndQuit" },
+      { t: "bye", reason: "wrongAccount" },
+      { t: "ack", n: 16 },
+      {
+        t: "turnCommand",
+        turn: 1,
+        wave: 2,
+        n: 3,
+        command: { fieldIndex: 0, turnCommand: { command: 3 }, preTurnCommand: null },
+      },
     ];
     for (const m of messages) {
       expect(decodeCoopMessage(encodeCoopMessage(m))).toEqual(m);
     }
+  });
+
+  it("is protocol 4", () => {
+    expect(COOP_PROTOCOL_VERSION).toBe(4);
   });
 
   it("returns null for malformed input", () => {

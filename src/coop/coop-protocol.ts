@@ -12,7 +12,7 @@ import type { SpeciesId } from "#enums/species-id";
 import type { Variant } from "#sprites/variant";
 
 /** Bumped whenever a message shape changes incompatibly. Peers with different versions refuse to connect. */
-export const COOP_PROTOCOL_VERSION = 3;
+export const COOP_PROTOCOL_VERSION = 4;
 
 export type CoopRole = "host" | "guest";
 
@@ -117,11 +117,30 @@ export type CoopRewardAction =
 
 // Payloads below are narrowed by later co-op plans.
 export type TurnCommandPayload = CoopTurnCommandPayload;
-export type CoopSessionSnapshot = Record<string, unknown>;
 export type CoopChoiceKind = string;
 
-export type CoopMessage =
-  | { t: "hello"; gameVersion: string; protocol: number; accountName: string }
+/** Why a player leaves a co-op run, so the partner can tell the player. */
+export type CoopByeReason = "saveAndQuit" | "wrongAccount" | "desync" | "timeout";
+
+/**
+ * A message between the two clients. Once connected, every message but `ack` carries `n`, its number in the sender's
+ * order (see `ReliableCoopTransport`); the game itself never reads it.
+ */
+export type CoopMessage = CoopMessageBody & { n?: number };
+
+type CoopMessageBody =
+  /**
+   * The first message on a new connection. `trainerId` tells accounts apart where every name is the same (offline),
+   * `resume` is set by a host continuing a saved run.
+   */
+  | {
+      t: "hello";
+      gameVersion: string;
+      protocol: number;
+      accountName: string;
+      trainerId: number;
+      resume?: boolean;
+    }
   /**
    * A player's starter selection. `picks` is only filled while `ready` (only confirmed picks are shown to the peer).
    * `account` is the sender's account snapshot, read for their pokemon once the run starts.
@@ -173,8 +192,11 @@ export type CoopMessage =
       seq?: number;
       accepted: boolean;
     }
-  | { t: "resume"; session: CoopSessionSnapshot }
-  | { t: "bye" };
+  /** Sent by a host continuing a saved run: the saved session (JSON, `coop` block included) both clients load. */
+  | { t: "resume"; session: string }
+  | { t: "bye"; reason?: CoopByeReason }
+  /** Every message numbered up to `n` has arrived; the sender need not resend them. */
+  | { t: "ack"; n: number };
 
 const COOP_MESSAGE_KINDS = [
   "hello",
@@ -188,6 +210,7 @@ const COOP_MESSAGE_KINDS = [
   "confirm",
   "resume",
   "bye",
+  "ack",
 ] as const satisfies readonly CoopMessage["t"][];
 
 const coopMessageKinds: ReadonlySet<string> = new Set(COOP_MESSAGE_KINDS);

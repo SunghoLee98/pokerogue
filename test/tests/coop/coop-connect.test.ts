@@ -35,10 +35,10 @@ describe("co-op connection", () => {
     const urls: string[] = [];
 
     const [host, guest] = await Promise.all([
-      hostCoop(pair.host, code => codes.push(code), { gameVersion: "1.0.0", accountName: "Hosty" }),
+      hostCoop(pair.host, code => codes.push(code), { gameVersion: "1.0.0", accountName: "Hosty", trainerId: 7 }),
       flush().then(() =>
         joinCoop(" loop-00 ", {
-          local: { gameVersion: "1.0.0", accountName: "Guesty" },
+          local: { gameVersion: "1.0.0", accountName: "Guesty", trainerId: 8 },
           defaultRelayUrl: "wss://relay.test",
           createTransport: url => {
             urls.push(url);
@@ -50,8 +50,10 @@ describe("co-op connection", () => {
 
     expect(codes).toEqual(["LOOP00"]);
     expect(urls).toEqual(["wss://relay.test"]);
-    expect(host).toEqual({ role: "host", transport: pair.host, peerAccountName: "Guesty" });
-    expect(guest).toEqual({ role: "guest", transport: pair.guest, peerAccountName: "Hosty" });
+    expect(host).toMatchObject({ role: "host", peerAccountName: "Guesty", peerTrainerId: 8, peerResume: false });
+    expect(guest).toMatchObject({ role: "guest", peerAccountName: "Hosty", peerTrainerId: 7, peerResume: false });
+    expect(host.transport).toBe(pair.host);
+    expect(guest.transport).toBe(pair.guest);
   });
 
   it("rejects a malformed join code without connecting", async () => {
@@ -112,7 +114,7 @@ describe("co-op connection", () => {
   it("opens a lobby with a starter selection", () => {
     const pair = createLoopbackPair();
     const lobby = openCoopLobby(
-      { role: "guest", transport: pair.guest, peerAccountName: "Hosty" },
+      { role: "guest", transport: pair.guest, peerAccountName: "Hosty", peerTrainerId: 0, peerResume: false },
       { getAccount: () => emptySnapshot },
     );
 
@@ -130,7 +132,7 @@ describe("co-op connection", () => {
     const peerMessages: string[] = [];
     pair.host.onMessage(message => peerMessages.push(message.t));
     openCoopLobby(
-      { role: "guest", transport: pair.guest, peerAccountName: "Hosty" },
+      { role: "guest", transport: pair.guest, peerAccountName: "Hosty", peerTrainerId: 0, peerResume: false },
       { getAccount: () => emptySnapshot },
     );
 
@@ -183,7 +185,7 @@ describe("co-op run from the lobby", () => {
     await pair.host.host();
     await pair.guest.join("LOOP00");
     const lobby = openCoopLobby(
-      { role: "host", transport: pair.host, peerAccountName: "Guesty" },
+      { role: "host", transport: pair.host, peerAccountName: "Guesty", peerTrainerId: 0, peerResume: false },
       { getAccount: () => emptySnapshot },
     );
     const guest = new CoopStarterSelection("guest", pair.guest, { getAccount: () => emptySnapshot });

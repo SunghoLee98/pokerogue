@@ -5,24 +5,21 @@
  */
 
 import { loggedInUser } from "#app/account";
-import { performHandshake } from "#coop/coop-handshake";
+import { globalScene } from "#app/global-scene";
+import { type CoopHandshakeResult, type CoopHelloInfo, performHandshake } from "#coop/coop-handshake";
 import type { CoopRole } from "#coop/coop-protocol";
 import type { CoopTransport, Unsubscribe } from "#coop/coop-transport";
 import { getDefaultRelayUrl, parseJoinInput, RelayWebSocketTransport } from "#coop/relay-websocket-transport";
 import { version } from "#package.json";
 
 /** A connected, version-checked link to the partner. */
-export interface CoopConnection {
+export interface CoopConnection extends CoopHandshakeResult {
   role: CoopRole;
   transport: CoopTransport;
-  peerAccountName: string;
 }
 
 /** What we tell the partner about ourselves in the handshake. */
-export interface CoopLocalInfo {
-  gameVersion: string;
-  accountName: string;
-}
+export type CoopLocalInfo = CoopHelloInfo;
 
 /** The typed join input is not a valid code, or names no relay to connect to. */
 export class CoopJoinInputError extends Error {
@@ -32,9 +29,13 @@ export class CoopJoinInputError extends Error {
   }
 }
 
-/** Our game version (`package.json`) and account name. */
+/** Our game version (`package.json`), account name and trainer id. */
 export function getLocalCoopInfo(): CoopLocalInfo {
-  return { gameVersion: version, accountName: loggedInUser?.username ?? "Guest" };
+  return {
+    gameVersion: version,
+    accountName: loggedInUser?.username ?? "Guest",
+    trainerId: globalScene?.gameData?.trainerId ?? 0,
+  };
 }
 
 /** Co-op needs a relay server; without a configured one the co-op menu is hidden. */
@@ -78,8 +79,8 @@ export async function hostCoop(
   } finally {
     peer.cancel();
   }
-  const { peerAccountName } = await performHandshake(transport, local);
-  return { role: "host", transport, peerAccountName };
+  const partner = await performHandshake(transport, local);
+  return { role: "host", transport, ...partner };
 }
 
 export interface CoopJoinOptions {
@@ -111,6 +112,6 @@ export async function joinCoop(input: string, options: CoopJoinOptions = {}): Pr
     transport.close();
     throw error;
   }
-  const { peerAccountName } = await performHandshake(transport, local);
-  return { role: "guest", transport, peerAccountName };
+  const partner = await performHandshake(transport, local);
+  return { role: "guest", transport, ...partner };
 }

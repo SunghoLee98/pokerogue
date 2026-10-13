@@ -47,7 +47,13 @@ class FakeSocket {
   }
 }
 
-const hello: CoopMessage = { t: "hello", gameVersion: "1.0.0", protocol: COOP_PROTOCOL_VERSION, accountName: "a" };
+const hello: CoopMessage = {
+  t: "hello",
+  gameVersion: "1.0.0",
+  protocol: COOP_PROTOCOL_VERSION,
+  accountName: "a",
+  trainerId: 0,
+};
 
 describe("RelayWebSocketTransport", () => {
   let sockets: FakeSocket[];

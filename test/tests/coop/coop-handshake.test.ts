@@ -21,8 +21,18 @@ describe("performHandshake", () => {
       performHandshake(host, { gameVersion: "1.12.1.0", accountName: "alice" }),
       performHandshake(guest, { gameVersion: "1.12.1.0", accountName: "bob" }),
     ]);
-    expect(hostResult).toEqual({ peerAccountName: "bob" });
-    expect(guestResult).toEqual({ peerAccountName: "alice" });
+    expect(hostResult).toMatchObject({ peerAccountName: "bob" });
+    expect(guestResult).toMatchObject({ peerAccountName: "alice" });
+  });
+
+  it("shares trainer ids and whether the host resumes a saved run", async () => {
+    const { host, guest } = await connectedPair();
+    const [hostResult, guestResult] = await Promise.all([
+      performHandshake(host, { gameVersion: "1.12.1.0", accountName: "alice", trainerId: 11, resume: true }),
+      performHandshake(guest, { gameVersion: "1.12.1.0", accountName: "bob", trainerId: 22 }),
+    ]);
+    expect(hostResult).toEqual({ peerAccountName: "bob", peerTrainerId: 22, peerResume: false });
+    expect(guestResult).toEqual({ peerAccountName: "alice", peerTrainerId: 11, peerResume: true });
   });
 
   it("works when one side starts later", async () => {
@@ -30,8 +40,8 @@ describe("performHandshake", () => {
     const hostHandshake = performHandshake(host, { gameVersion: "1.12.1.0", accountName: "alice" });
     await new Promise(resolve => setTimeout(resolve, 0));
     const guestResult = await performHandshake(guest, { gameVersion: "1.12.1.0", accountName: "bob" });
-    expect(guestResult).toEqual({ peerAccountName: "alice" });
-    await expect(hostHandshake).resolves.toEqual({ peerAccountName: "bob" });
+    expect(guestResult).toMatchObject({ peerAccountName: "alice" });
+    await expect(hostHandshake).resolves.toMatchObject({ peerAccountName: "bob" });
   });
 
   it("releases its subscriptions when done", async () => {
@@ -64,7 +74,7 @@ describe("performHandshake", () => {
   it("rejects mismatched protocol versions", async () => {
     const { host, guest } = await connectedPair();
     const handshake = performHandshake(host, { gameVersion: "1.12.1.0", accountName: "alice" });
-    guest.send({ t: "hello", gameVersion: "1.12.1.0", protocol: 999, accountName: "bob" });
+    guest.send({ t: "hello", gameVersion: "1.12.1.0", protocol: 999, accountName: "bob", trainerId: 0 });
     await expect(handshake).rejects.toBeInstanceOf(CoopVersionMismatchError);
   });
 

@@ -25,18 +25,36 @@ export class CoopHandshakeError extends Error {
   }
 }
 
+/** What a player tells the partner in the handshake. */
+export interface CoopHelloInfo {
+  /** The `version` from `package.json` */
+  gameVersion: string;
+  accountName: string;
+  /** The account's trainer id, `0` if unknown */
+  trainerId?: number;
+  /** Set by a host continuing a saved run */
+  resume?: boolean;
+}
+
+/** What the handshake learned about the partner. */
+export interface CoopHandshakeResult {
+  peerAccountName: string;
+  peerTrainerId: number;
+  /** Whether the partner is a host continuing a saved run */
+  peerResume: boolean;
+}
+
 /**
  * Send our `hello` over a connected transport and wait for the peer's.
  * On a version mismatch, says `bye` and closes the transport.
- * @param local - Our game version (the `version` from `package.json`) and account name
+ * @param local - What we tell the partner
  * @param timeoutMs - How long to wait for the peer's `hello`
- * @returns The peer's account name
  */
 export function performHandshake(
   transport: CoopTransport,
-  local: { gameVersion: string; accountName: string },
+  local: CoopHelloInfo,
   timeoutMs = 15_000,
-): Promise<{ peerAccountName: string }> {
+): Promise<CoopHandshakeResult> {
   return new Promise((resolve, reject) => {
     let settled = false;
     let unsubscribeMessage: Unsubscribe | undefined;
@@ -71,6 +89,8 @@ export function performHandshake(
       gameVersion: local.gameVersion,
       protocol: COOP_PROTOCOL_VERSION,
       accountName: local.accountName,
+      trainerId: local.trainerId ?? 0,
+      ...(local.resume && { resume: true }),
     });
 
     // Buffered messages are delivered synchronously while subscribing, so the handshake may already be done after this.
@@ -90,7 +110,13 @@ export function performHandshake(
         });
         return;
       }
-      finish(() => resolve({ peerAccountName: message.accountName }));
+      finish(() =>
+        resolve({
+          peerAccountName: message.accountName,
+          peerTrainerId: message.trainerId ?? 0,
+          peerResume: message.resume === true,
+        }),
+      );
     });
     if (settled) {
       cleanUp();

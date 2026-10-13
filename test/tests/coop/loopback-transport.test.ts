@@ -4,7 +4,7 @@ import { createLoopbackPair } from "#coop/loopback-transport";
 import { describe, expect, it } from "vitest";
 
 function hello(accountName: string): CoopMessage {
-  return { t: "hello", gameVersion: "1.0.0", protocol: COOP_PROTOCOL_VERSION, accountName };
+  return { t: "hello", gameVersion: "1.0.0", protocol: COOP_PROTOCOL_VERSION, accountName, trainerId: 0 };
 }
 
 /** Let queued microtasks (message delivery) run. */
