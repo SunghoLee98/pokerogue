@@ -76,11 +76,12 @@ export class CoopCaptureDecision {
   private readonly partyIds: number[];
   readonly isLocal: boolean;
 
-  constructor(session: CoopSession, throwerId: number) {
+  /** @param owner - The player who caught the pokemon and chooses */
+  constructor(session: CoopSession, owner: CoopRole) {
     this.session = session;
     this.seq = session.nextDecisionSeq();
     this.partyIds = globalScene.getPlayerParty().map(p => p.id);
-    this.isLocal = getThrowerRole(session, throwerId) === session.localRole;
+    this.isLocal = owner === session.localRole;
   }
 
   /** The local thrower released a pokemon in the party screen and adds the catch at `insertIndex`. */
@@ -153,5 +154,50 @@ function releasePartyMember(pokemonId: number): void {
  * @returns `null` outside co-op or when the thrower is unknown
  */
 export function beginCoopCaptureDecision(throwerId?: number): CoopCaptureDecision | null {
-  return coopSession && throwerId !== undefined ? new CoopCaptureDecision(coopSession, throwerId) : null;
+  return coopSession && throwerId !== undefined
+    ? new CoopCaptureDecision(coopSession, getThrowerRole(coopSession, throwerId))
+    : null;
+}
+
+/**
+ * Who gets a pokemon a mystery encounter gives (spec 3.10): the player who chose the encounter's option, that is the
+ * wave's picker.
+ */
+function getEncounterChooser(session: CoopSession): CoopRole {
+  return session.pickerForWave(globalScene.currentBattle.waveIndex);
+}
+
+/**
+ * Record that a pokemon a mystery encounter gives (`catchPokemon`) belongs to the player who chose the option.
+ * Called before the catch's account records, which then go to that player's account.
+ */
+export function registerCoopEncounterCatch(pokemon: Pokemon): void {
+  if (coopSession) {
+    coopSession.ownership.set(pokemon.id, getEncounterChooser(coopSession));
+  }
+}
+
+/**
+ * Whether a pokemon a mystery encounter gives needs room first.
+ * Solo: the party is full. Co-op: the chooser already owns {@linkcode COOP_MAX_OWNED} pokemon.
+ */
+export function isEncounterCatchRosterFull(): boolean {
+  const party = globalScene.getPlayerParty();
+  if (!coopSession) {
+    return party.length === PLAYER_PARTY_MAX_SIZE;
+  }
+  return (
+    coopSession.ownership.countOwnedBy(
+      getEncounterChooser(coopSession),
+      party.map(p => p.id),
+    ) >= COOP_MAX_OWNED
+  );
+}
+
+/**
+ * Begin the chooser's choice when an encounter gives a pokemon to a full roster, as for a catch.
+ * @returns `null` outside co-op
+ */
+export function beginCoopEncounterCatchDecision(): CoopCaptureDecision | null {
+  return coopSession ? new CoopCaptureDecision(coopSession, getEncounterChooser(coopSession)) : null;
 }

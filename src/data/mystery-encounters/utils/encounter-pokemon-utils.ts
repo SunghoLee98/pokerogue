@@ -4,6 +4,12 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { coopCreditsLocalAccount } from "#coop/coop-account";
+import {
+  beginCoopEncounterCatchDecision,
+  isEncounterCatchRosterFull,
+  registerCoopEncounterCatch,
+} from "#coop/coop-capture";
 import { modifierTypes } from "#data/data-lists";
 import { Gender } from "#data/gender";
 import {
@@ -634,6 +640,7 @@ export async function catchPokemon(
   isObtain = false,
 ): Promise<void> {
   const { gameData, phaseManager, pokemonInfoContainer, ui } = globalScene;
+  registerCoopEncounterCatch(pokemon);
 
   const speciesForm = pokemon.fusionSpecies ? pokemon.getFusionSpeciesForm() : pokemon.getSpeciesForm();
 
@@ -658,7 +665,9 @@ export async function catchPokemon(
 
   pokemonInfoContainer.show(pokemon, true);
 
-  gameData.updateSpeciesDexIvs(pokemon.species.getRootSpeciesId(true), pokemon.ivs);
+  if (coopCreditsLocalAccount(pokemon)) {
+    gameData.updateSpeciesDexIvs(pokemon.species.getRootSpeciesId(true), pokemon.ivs);
+  }
 
   // TODO: remove all this duplicated code from `AttemptCapturePhase`
   return new Promise(resolve => {
@@ -704,7 +713,8 @@ export async function catchPokemon(
           end();
           return;
         }
-        if (globalScene.getPlayerParty().length === 6) {
+        if (isEncounterCatchRosterFull()) {
+          const coopDecision = beginCoopEncounterCatchDecision();
           const addToPartyMenuConfig: OptionSelectModeConfig = {
             options: [
               {
@@ -756,6 +766,7 @@ export async function catchPokemon(
                   ui.setMode(UiMode.PARTY, PartyUiMode.RELEASE, 0, (slotIndex: number, _option: PartyOption) => {
                     ui.setMode(UiMode.MESSAGE).then(() => {
                       if (slotIndex < 6) {
+                        coopDecision?.replaced(slotIndex);
                         addToParty(slotIndex);
                       } else {
                         promptRelease();
@@ -769,6 +780,7 @@ export async function catchPokemon(
                 label: i18next.t("menu:no"),
                 handler: () => {
                   ui.setMode(UiMode.MESSAGE).then(() => {
+                    coopDecision?.keptOut();
                     removePokemon();
                     end();
                   });
@@ -788,7 +800,13 @@ export async function catchPokemon(
             });
           };
 
-          promptRelease();
+          const keepOut = () => {
+            removePokemon();
+            end();
+          };
+          if (!coopDecision?.awaitThrower({ replace: addToParty, keepOut })) {
+            promptRelease();
+          }
         } else {
           addToParty();
         }

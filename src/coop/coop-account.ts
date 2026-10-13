@@ -40,3 +40,14 @@ export function recordCoopPartnerCatch(gameData: GameData, pokemon: Pokemon): Pr
   gameData.setPokemonSeen(pokemon, false);
   return Promise.resolve(false);
 }
+
+/**
+ * A party pokemon turned into a new one (Weird Dream's transformation, a Global Trade System trade) keeps its owner
+ * (spec 3.10): the new pokemon belongs to whoever owned the old one.
+ */
+export function inheritCoopOwner(previous: Pokemon, next: Pokemon): void {
+  const owner = coopSession?.ownership.get(previous.id);
+  if (owner) {
+    coopSession?.ownership.set(next.id, owner);
+  }
+}

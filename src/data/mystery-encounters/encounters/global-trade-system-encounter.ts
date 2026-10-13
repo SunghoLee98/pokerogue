@@ -3,6 +3,7 @@ import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { inheritCoopOwner } from "#coop/coop-account";
 import { coopRandInt } from "#coop/coop-random";
 import { Gender, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -236,6 +237,7 @@ export const GlobalTradeSystemEncounter: MysteryEncounter = MysteryEncounterBuil
           dataSource,
         );
         globalScene.getPlayerParty().push(newPlayerPokemon);
+        inheritCoopOwner(tradedPokemon, newPlayerPokemon);
         await newPlayerPokemon.loadAssets();
 
         for (const mod of modifiers) {
@@ -340,6 +342,7 @@ export const GlobalTradeSystemEncounter: MysteryEncounter = MysteryEncounterBuil
           dataSource,
         );
         globalScene.getPlayerParty().push(newPlayerPokemon);
+        inheritCoopOwner(tradedPokemon, newPlayerPokemon);
         await newPlayerPokemon.loadAssets();
 
         for (const mod of modifiers) {
