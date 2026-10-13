@@ -18,6 +18,7 @@ import { COOP_SESSION_SLOT, CoopSession, setCoopSession } from "#coop/coop-sessi
 import { createStarterFromPayload } from "#coop/coop-starter-payload";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import type { CoopTransport } from "#coop/coop-transport";
+import { attachCoopWaitButton } from "#coop/coop-wait-button";
 import { GameModes } from "#enums/game-modes";
 import type { PlayerPokemon } from "#field/pokemon";
 
@@ -42,6 +43,7 @@ export function beginCoopSession(
   session.participants = { ...participants };
   setCoopSession(session);
   watchCoopConnection(transport);
+  attachCoopWaitButton(session);
   return session;
 }
 

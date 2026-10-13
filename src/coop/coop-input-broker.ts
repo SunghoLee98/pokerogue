@@ -91,6 +91,9 @@ export class CoopInputBroker {
   private readonly pings = new Mailbox<CoopPingMessage>();
   private readonly choices = new Map<string, Mailbox<CoopChoiceMessage>>();
   private readonly unsubscribe: Unsubscribe;
+  /** Waits for the partner that have not been answered yet */
+  private pendingWaits = 0;
+  private readonly waitingListeners = new Set<(waiting: boolean) => void>();
 
   constructor(transport: CoopTransport) {
     this.transport = transport;
@@ -128,7 +131,8 @@ export class CoopInputBroker {
     if (message) {
       return Promise.resolve(message);
     }
-    return new Promise(resolve => this.turnWaiters.push({ key: turnKey(wave, turn), match, resolve }));
+    const done = this.beginWait();
+    return new Promise(resolve => this.turnWaiters.push({ key: turnKey(wave, turn), match, resolve: done(resolve) }));
   }
 
   /** Get the partner's decision with this sequence number, waiting for it if needed. */
@@ -138,7 +142,8 @@ export class CoopInputBroker {
       this.decisions.delete(seq);
       return Promise.resolve(decision);
     }
-    return new Promise(resolve => this.decisionWaiters.set(seq, resolve));
+    const done = this.beginWait();
+    return new Promise(resolve => this.decisionWaiters.set(seq, done(resolve)));
   }
 
   /** Get the partner's answer to the local request of this kind and number, waiting for it if needed. */
@@ -149,7 +154,8 @@ export class CoopInputBroker {
       this.confirms.delete(key);
       return Promise.resolve(accepted);
     }
-    return new Promise(resolve => this.confirmWaiters.set(key, resolve));
+    const done = this.beginWait();
+    return new Promise(resolve => this.confirmWaiters.set(key, done(resolve)));
   }
 
   /** Get the next encounter option the partner picked, waiting for it if needed. */
@@ -158,7 +164,8 @@ export class CoopInputBroker {
     if (index !== undefined) {
       return Promise.resolve(index);
     }
-    return new Promise(resolve => this.encounterOptionWaiters.push(resolve));
+    const done = this.beginWait();
+    return new Promise(resolve => this.encounterOptionWaiters.push(done(resolve)));
   }
 
   /** Receive the reward screen events. Events that came before anyone listened are handed over first. */
@@ -182,8 +189,44 @@ export class CoopInputBroker {
     return () => this.turnListeners.delete(handler);
   }
 
+  /** Whether the game is waiting for an input of the partner. */
+  get waiting(): boolean {
+    return this.pendingWaits > 0;
+  }
+
+  /** Be told when the game starts or stops waiting for the partner. */
+  onWaitingChange(handler: (waiting: boolean) => void): Unsubscribe {
+    this.waitingListeners.add(handler);
+    return () => this.waitingListeners.delete(handler);
+  }
+
+  /** Count a wait that starts now. @returns A wrapper for the wait's resolver that ends it. */
+  private beginWait(): <T>(resolve: (value: T) => void) => (value: T) => void {
+    this.setPendingWaits(this.pendingWaits + 1);
+    let ended = false;
+    return resolve => value => {
+      if (!ended) {
+        ended = true;
+        this.setPendingWaits(this.pendingWaits - 1);
+      }
+      resolve(value);
+    };
+  }
+
+  private setPendingWaits(count: number): void {
+    const was = this.waiting;
+    this.pendingWaits = count;
+    if (was !== this.waiting) {
+      for (const listener of [...this.waitingListeners]) {
+        listener(this.waiting);
+      }
+    }
+  }
+
   /** Stop listening to the transport. Pending waits never resolve. */
   dispose(): void {
+    this.setPendingWaits(0);
+    this.waitingListeners.clear();
     this.unsubscribe();
     this.turnMessages.clear();
     this.turnWaiters = [];

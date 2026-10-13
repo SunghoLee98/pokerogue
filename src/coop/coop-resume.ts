@@ -16,6 +16,7 @@ import { restoreCoopRewardCounters } from "#coop/coop-reward";
 import { normalizeCoopSaveData } from "#coop/coop-save";
 import { COOP_SESSION_SLOT, CoopSession, coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopTransport, Unsubscribe } from "#coop/coop-transport";
+import { attachCoopWaitButton } from "#coop/coop-wait-button";
 import type { SessionSaveData } from "#types/save-data";
 
 /** `GameData.initSessionFromData` is private; co-op resumes through it the way loading a slot does. */
@@ -44,6 +45,7 @@ export async function resumeCoopRun(role: CoopRole, transport: CoopTransport, se
   session.restoreDecisionCount(coop.decisionSeq);
   setCoopSession(session);
   watchCoopConnection(transport);
+  attachCoopWaitButton(session);
   restoreCoopRewardCounters(session, { gen: coop.rewardGen, seq: coop.rewardSeq });
 
   globalScene.sessionSlotId = COOP_SESSION_SLOT;

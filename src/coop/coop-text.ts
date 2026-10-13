@@ -91,6 +91,8 @@ const COOP_TEXT = {
     en: "Your partner chose save and quit. Returning to the title screen.",
     ko: "파트너가 세이브 후 나갔습니다. 타이틀로 돌아갑니다.",
   },
+  saveAndQuitButton: { en: "[Menu] Save and quit", ko: "[메뉴] 세이브 후 나가기" },
+  saveAndQuitConfirm: { en: "Press [Menu] again to save and quit", ko: "[메뉴]를 한 번 더 누르면 세이브 후 나갑니다" },
   savingAndQuitting: { en: "Saving and quitting...", ko: "세이브 후 나가는 중..." },
   desyncDetected: {
     en: "The two games no longer match. Saving and returning to the title screen.",
