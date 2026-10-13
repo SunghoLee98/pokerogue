@@ -9,6 +9,7 @@ import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import { FieldTripEncounter } from "#mystery-encounters/field-trip-encounter";
 import { allMysteryEncounters, mysteryEncountersByBiome } from "#mystery-encounters/mystery-encounter-biomes";
 import { GameManager } from "#test/framework/game-manager";
 import { CoopTestPartner, waitForCoop } from "#test/utils/coop-partner";
@@ -19,7 +20,7 @@ import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler
 import type { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
 import type { PartyUiHandler } from "#ui/party-ui-handler";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const snapshot = (trainerId: number): CoopAccountSnapshot => ({
   trainerId,
@@ -226,13 +227,25 @@ describe("co-op mystery encounters", () => {
       await waitForCoop(() => choices(partner).some(m => m.kind === "ownerAsk"));
       partner.send({ t: "confirm", kind: "mePokemon", wave: WAVE, seq: 0, accepted: false });
       await waitForCoop(() => game.textInterceptor.logs.includes(coopText("ownerDeclined")));
-      (game.scene.ui.getHandler() as MessageUiHandler).processInput(Button.ACTION);
+      // Dismiss the notice only if it still waits for a press: once the party screen is back, a press there would open
+      // its option menu and the pick below would land on the wrong option.
+      await waitForCoop(
+        () =>
+          game.scene.ui.mode === UiMode.PARTY || game.scene.ui.getHandler<MessageUiHandler>()["awaitingActionInput"],
+      );
+      if (game.scene.ui.mode !== UiMode.PARTY) {
+        game.scene.ui.getHandler<MessageUiHandler>().processInput(Button.ACTION);
+      }
       await selectInParty(0);
       await waitForCoop(() => worked(0));
 
       expect(game.textInterceptor.logs).toContain(coopText("ownerDeclined"));
       expect(worked(1)).toBe(false);
       expect(choices(partner).at(-1)?.payload).toEqual({ kind: "partySelect", seq: 0, slot: 0 });
+      // The party screen is shared by every test the worker runs next: an option menu left open there makes the next
+      // party pick (solo switches included) land on the wrong option.
+      const partyUi = game.scene.ui.handlers[UiMode.PARTY] as PartyUiHandler;
+      expect(partyUi["optionsMode"]).toBe(false);
     });
 
     /** As the owner of the asked pokemon: the host picks option 1 and asks for the guest's pokemon. */
@@ -277,6 +290,20 @@ describe("co-op mystery encounters", () => {
   describe("follow-up options", () => {
     /** Field Trip's first option picks a pokemon, then one of its moves. */
     const WAVE = 13;
+
+    // Field Trip writes the outcome text into its shared option dialogue; the encounter tests the worker runs next
+    // (solo ones included) must find it as defined.
+    afterEach(() => {
+      for (const option of FieldTripEncounter.options) {
+        delete option.dialogue?.selected;
+      }
+    });
+
+    afterAll(() => {
+      for (const option of FieldTripEncounter.options) {
+        expect(option.dialogue).not.toHaveProperty("selected");
+      }
+    });
 
     async function startFieldTrip(role: CoopRole): Promise<CoopTestPartner> {
       game.override.startingWave(WAVE).moveset([MoveId.TACKLE, MoveId.GROWL]);
