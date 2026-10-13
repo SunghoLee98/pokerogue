@@ -81,6 +81,7 @@ describe("co-op pokemon from mystery encounters", () => {
     const entry = rattata();
     entry.caughtAttr = 0n;
     entry.caughtCount = 0;
+    entry.ivs = [0, 0, 0, 0, 0, 0];
     return partner;
   }
 
@@ -107,6 +108,7 @@ describe("co-op pokemon from mystery encounters", () => {
       expect(ownerOf(added!)).toBe("guest");
       expect(rattata().caughtCount).toBe(0);
       expect(rattata().caughtAttr).toBe(0n);
+      expect(rattata().ivs).toEqual([0, 0, 0, 0, 0, 0]);
     });
 
     it("adds it right away when the chooser has room, however many the partner has", async () => {
