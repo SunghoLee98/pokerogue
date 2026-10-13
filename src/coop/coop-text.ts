@@ -76,8 +76,8 @@ const COOP_TEXT = {
     ko: "이 협동 세이브의 파트너 계정이 아닙니다.",
   },
   partnerReconnecting: {
-    en: "Lost the connection to your partner. Waiting for them to reconnect... ({{seconds}}s)",
-    ko: "파트너와 연결이 끊겼습니다. 재접속을 기다리는 중... ({{seconds}}초)",
+    en: "Partner disconnected. Waiting... ({{seconds}}s)",
+    ko: "파트너 연결 끊김. 재접속 대기 중... ({{seconds}}초)",
   },
   connectionLost: {
     en: "Your partner did not come back. Returning to the title screen.",

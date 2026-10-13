@@ -125,6 +125,7 @@ export class GameWrapper {
       },
       getTweensOf: () => [],
       killTweensOf: () => [] as any,
+      killAll: () => [] as any,
       // @ts-expect-error
       chain: data => {
         // TODO: our mock of `chain` should have the same signature as the real one, which returns the chain

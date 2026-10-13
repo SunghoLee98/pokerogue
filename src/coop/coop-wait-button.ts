@@ -2,9 +2,9 @@
  * The "save and quit" button shown while waiting for the partner (spec 3.8).
  *
  * Waiting has no time limit, so whoever waits can end the run instead: the host keeps the save made at the start of
- * the current wave and both players return to the title screen. The button is pressed with the menu key (or a click),
- * twice to confirm. It is drawn on its own, not as a UI mode, so the partner's input can arrive and continue the game
- * at any time without a menu to close first.
+ * the current wave and both players return to the title screen. The button sits at the top right and is pressed with
+ * the menu key (or a click), twice to confirm. It is drawn on its own, not as a UI mode, so the partner's input can
+ * arrive and continue the game at any time without a menu to close first.
  * @module
  */
 
@@ -21,8 +21,14 @@ let armed = false;
 
 function show(text: string): void {
   if (button?.scene !== globalScene) {
-    // Top left, under the banner line.
-    button = addTextObject(3, -globalScene.scaledCanvas.height + 30, "", TextStyle.PARTY);
+    // Top right, under the wave and money: clear of both sides' info boxes during battle.
+    button = addTextObject(
+      globalScene.scaledCanvas.width - 2,
+      -globalScene.scaledCanvas.height + 22,
+      "",
+      TextStyle.PARTY,
+    );
+    button.setOrigin(1, 0);
     button.setName("coop-wait-button");
     button.setInteractive();
     button.on("pointerdown", () => pressCoopWaitButton());

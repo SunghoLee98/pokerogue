@@ -147,6 +147,9 @@ export function endCoopRun(reason: CoopEndReason, bye?: CoopByeReason): void {
   setTimeout(async () => {
     await saveWaveStart(session);
     lobbyExit.leave();
+    // The run may end in the middle of a turn: stop what is still running, so nothing touches the scene it resets.
+    globalScene.phaseManager.clearAllPhases();
+    globalScene.tweens.killAll();
     coopExit.returnToTitle();
   }, coopExit.noticeMs);
 }

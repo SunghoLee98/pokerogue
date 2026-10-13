@@ -119,6 +119,22 @@ describe("co-op connection loss", () => {
     expect(coopSession).toBeNull();
   });
 
+  it("stops the running game before returning to the title", async () => {
+    const partner = await startAs("guest");
+    // Animations and queued phases still running when the run ends.
+    const killAll = vi.spyOn(game.scene.tweens, "killAll");
+    game.scene.phaseManager.pushNew("MessagePhase", "still queued");
+    let stopped = false;
+    returnToTitle.mockImplementation(() => {
+      stopped = !game.scene.phaseManager.hasPhaseOfType("MessagePhase") && killAll.mock.calls.length > 0;
+    });
+
+    partner.drop();
+    await waitForCoop(() => returnToTitle.mock.calls.length > 0);
+
+    expect(stopped).toBe(true);
+  });
+
   it("the guest saves no session when the host does not come back", async () => {
     const partner = await startAs("guest");
 
