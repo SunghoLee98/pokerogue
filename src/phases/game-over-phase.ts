@@ -5,6 +5,7 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { bypassLogin } from "#constants/app-constants";
+import { coopSession } from "#coop/coop-session";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -82,7 +83,8 @@ export class GameOverPhase extends BattlePhase {
       return;
     }
 
-    if (this.isVictory || !settings.general.enableRetries) {
+    // Co-op has no retries: the setting is per client and only the host has the save to retry from.
+    if (this.isVictory || !settings.general.enableRetries || coopSession) {
       this.handleGameOver();
       return;
     }
@@ -246,7 +248,10 @@ export class GameOverPhase extends BattlePhase {
 
     // If Online, execute apiFetch as intended
     // If Offline, execute offlineNewClear() only for victory, a localStorage implementation of newClear daily run checks
-    if (!bypassLogin || isLocalServerConnected) {
+    // Co-op clears are not classic clears, so co-op never asks (spec 4.6); how they count is decided later.
+    if (coopSession) {
+      doGameOver(!globalScene.gameMode.isDaily);
+    } else if (!bypassLogin || isLocalServerConnected) {
       pokerogueApi.savedata.session
         .newclear({
           slot: globalScene.sessionSlotId,
