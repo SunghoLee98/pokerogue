@@ -13,8 +13,10 @@ let shown: string | null = null;
 /**
  * Show `text` at the top of the screen, replacing what the banner showed before.
  * @param onRewardScreen - At the very top, above the reward screen's shop row; otherwise below the held item bar
+ * @param aboveScreens - In front of the other screens, for notices that must not be missed (a lost connection),
+ *   even on screens that cover the battle such as the starter selection; otherwise behind them
  */
-export function showCoopBanner(text: string, onRewardScreen = false): void {
+export function showCoopBanner(text: string, onRewardScreen = false, aboveScreens = false): void {
   if (banner?.scene !== globalScene) {
     // Small, in the top left corner: clear of the shop row and the wave and money at the top right.
     banner = addTextObject(3, -globalScene.scaledCanvas.height + 2, "", TextStyle.PARTY);
@@ -23,8 +25,12 @@ export function showCoopBanner(text: string, onRewardScreen = false): void {
   }
   banner.setY(-globalScene.scaledCanvas.height + (onRewardScreen ? 2 : 20));
   banner.setText(text).setVisible(true);
-  // Behind the other screens (the party screen opened from the reward screen covers it).
-  globalScene.ui.sendToBack(banner);
+  if (aboveScreens) {
+    globalScene.ui.bringToTop(banner);
+  } else {
+    // Behind the other screens (the party screen opened from the reward screen covers it).
+    globalScene.ui.sendToBack(banner);
+  }
   shown = text;
 }
 

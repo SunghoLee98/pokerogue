@@ -183,4 +183,25 @@ describe("co-op connection loss", () => {
 
     expect(coopLobby).toBeNull();
   });
+
+  it("shows the connection notice above the other screens", async () => {
+    await game.runToTitle();
+    const pair = createLoopbackPair();
+    await pair.host.host();
+    await pair.guest.join("LOOP00");
+    openCoopLobby(
+      { role: "guest", transport: pair.guest, peerAccountName: "Hosty", peerTrainerId: 0, peerResume: false },
+      { getAccount: () => snapshot(2) },
+    );
+    const bringToTop = vi.spyOn(game.scene.ui, "bringToTop");
+    const sendToBack = vi.spyOn(game.scene.ui, "sendToBack");
+
+    // The starter selection screen is drawn over most of the screen.
+    pair.drop();
+    expect(getCoopBannerText()).toBe(coopText("partnerReconnecting", { seconds: 1 }));
+    const banner = game.scene.ui.getByName("coop-banner");
+    expect(bringToTop).toHaveBeenCalledWith(banner);
+    expect(sendToBack).not.toHaveBeenCalledWith(banner);
+    await waitForCoop(() => returnToTitle.mock.calls.length > 0);
+  });
 });

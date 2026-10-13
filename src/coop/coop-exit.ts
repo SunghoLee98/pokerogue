@@ -82,7 +82,7 @@ export function watchCoopConnection(transport: CoopTransport): void {
       const deadline = Date.now() + coopExit.reconnectWindowMs;
       const show = () => {
         const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-        showCoopBanner(coopText("partnerReconnecting", { seconds: left }));
+        showCoopBanner(coopText("partnerReconnecting", { seconds: left }), false, true);
       };
       show();
       timer = setInterval(
@@ -143,7 +143,7 @@ export function endCoopRun(reason: CoopEndReason, bye?: CoopByeReason): void {
   if (bye) {
     transport.send({ t: "bye", reason: bye });
   }
-  showCoopBanner(coopText(reason satisfies CoopTextKey));
+  showCoopBanner(coopText(reason satisfies CoopTextKey), false, true);
   setTimeout(async () => {
     await saveWaveStart(session);
     lobbyExit.leave();
