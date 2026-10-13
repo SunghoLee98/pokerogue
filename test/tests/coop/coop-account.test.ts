@@ -1,3 +1,4 @@
+import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { coopCreditsLocalAccount } from "#coop/coop-account";
 import { withCoopBallTarget } from "#coop/coop-ball";
 import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
@@ -6,10 +7,12 @@ import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { MoveId } from "#enums/move-id";
+import { Nature } from "#enums/nature";
 import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
+import { PokemonNatureChangeModifierType } from "#modifiers/modifier-type";
 import type { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { CoopTestPartner, synthesizeBallCommand, synthesizeMoveCommand } from "#test/utils/coop-partner";
@@ -82,7 +85,10 @@ describe("co-op account credit", () => {
     entry.caughtCount = 0;
     entry.seenCount = 0;
     entry.ivs = [0, 0, 0, 0, 0, 0];
-    game.scene.gameData.starterData[speciesId].candyCount = 0;
+    const starterEntry = game.scene.gameData.starterData[speciesId];
+    if (starterEntry) {
+      starterEntry.candyCount = 0;
+    }
   }
 
   it("credits every pokemon outside co-op", async () => {
@@ -176,6 +182,60 @@ describe("co-op account credit", () => {
     it("records the host's own catch on the host's client", async () => {
       await catchFirstEnemy("host", "host");
       expect(entry().caughtCount).toBe(1);
+    });
+  });
+
+  describe("the owner's records", () => {
+    const starter = (speciesId: SpeciesId) => game.scene.gameData.starterData[speciesId];
+
+    it("keeps friendship candy progress on the owner's account", async () => {
+      await start("host");
+      const { host, guest } = owned();
+      const before = { host: starter(SpeciesId.BULBASAUR).friendship, guest: starter(SpeciesId.CHARMANDER).friendship };
+      const guestFriendship = guest.friendship;
+
+      host.addFriendship(10);
+      guest.addFriendship(10);
+
+      // The pokemon's own friendship is shared state and rises for both.
+      expect(guest.friendship).toBeGreaterThan(guestFriendship);
+      expect(starter(SpeciesId.BULBASAUR).friendship).toBeGreaterThan(before.host);
+      expect(starter(SpeciesId.CHARMANDER).friendship).toBe(before.guest);
+    });
+
+    it("keeps an evolution's dex entry on the owner's account", async () => {
+      await start("host");
+      const { host, guest } = owned();
+      forget(SpeciesId.CHARMELEON);
+      forget(SpeciesId.IVYSAUR);
+
+      await guest.evolve(speciesDataRegistry.getEvolutions(SpeciesId.CHARMANDER)[0], guest.getSpeciesForm());
+      await host.evolve(speciesDataRegistry.getEvolutions(SpeciesId.BULBASAUR)[0], host.getSpeciesForm());
+
+      const charmeleon = game.scene.gameData.dexData[SpeciesId.CHARMELEON];
+      expect(guest.species.speciesId).toBe(SpeciesId.CHARMELEON);
+      expect(charmeleon.caughtAttr).toBe(0n);
+      expect(charmeleon.ivs).toEqual([0, 0, 0, 0, 0, 0]);
+      expect(charmeleon.seenAttr).not.toBe(0n);
+      const ivysaur = game.scene.gameData.dexData[SpeciesId.IVYSAUR];
+      expect(ivysaur.caughtAttr).not.toBe(0n);
+      expect(ivysaur.ivs).toEqual(host.ivs);
+    });
+
+    it("unlocks a mint's nature on the owner's account only", async () => {
+      await start("host");
+      const { host, guest } = owned();
+      const dex = game.scene.gameData.dexData;
+      for (const speciesId of [SpeciesId.BULBASAUR, SpeciesId.CHARMANDER]) {
+        dex[speciesId].natureAttr = 0;
+      }
+
+      new PokemonNatureChangeModifierType(Nature.ADAMANT).newModifier(guest)!.apply(guest);
+      new PokemonNatureChangeModifierType(Nature.ADAMANT).newModifier(host)!.apply(host);
+
+      expect(guest.getNature()).toBe(Nature.ADAMANT);
+      expect(dex[SpeciesId.CHARMANDER].natureAttr).toBe(0);
+      expect(dex[SpeciesId.BULBASAUR].natureAttr).not.toBe(0);
     });
   });
 });

@@ -18,6 +18,7 @@ import { FusionSpeciesFormEvolution, SpeciesFormEvolution, validateShedinjaEvo }
 import { BASE_HIDDEN_ABILITY_RATE, BASE_SHINY_CHANCE, SHINY_EPIC_CHANCE, SHINY_VARIANT_CHANCE } from "#balance/rates";
 import type { FORCED_RIVAL_SIGNATURE_MOVES } from "#balance/signature-moves";
 import { getStarterValueFriendshipCap, TRAINER_MAX_FRIENDSHIP_WAVE, TRAINER_MIN_FRIENDSHIP } from "#balance/starters";
+import { coopCreditsLocalAccount } from "#coop/coop-account";
 import { applyCoopBossStatMultiplier } from "#coop/coop-battle-rules";
 import { getPokemonSimData, getWorldSimData } from "#coop/coop-sim-data";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
@@ -6163,6 +6164,9 @@ export class PlayerPokemon extends Pokemon {
         : newFriendship;
 
     this.friendship = Math.min(finalFriendship, 255);
+    if (!coopCreditsLocalAccount(this)) {
+      return;
+    }
     if (this.friendship >= 255) {
       globalScene.validateAchv(achvs.MAX_FRIENDSHIP);
       awardRibbonsToSpeciesLine(this.species.speciesId, RibbonData.FRIENDSHIP);
@@ -6319,7 +6323,9 @@ export class PlayerPokemon extends Pokemon {
         }
       }
       if (!globalScene.gameMode.isDaily || this.metBiome > -1) {
-        globalScene.gameData.updateSpeciesDexIvs(this.species.speciesId, this.ivs);
+        if (coopCreditsLocalAccount(this)) {
+          globalScene.gameData.updateSpeciesDexIvs(this.species.speciesId, this.ivs);
+        }
         globalScene.gameData.setPokemonSeen(this, false);
         globalScene.gameData.setPokemonCaught(this, false).then(() => updateAndResolve());
       } else {
