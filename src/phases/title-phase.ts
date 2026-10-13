@@ -11,6 +11,7 @@ import { bypassLogin } from "#constants/app-constants";
 import { isCoopAvailable } from "#coop/coop-connect";
 import { createCoopGameMode } from "#coop/coop-game-start";
 import { coopLobby, leaveCoop } from "#coop/coop-lobby";
+import { queueCoopResumeSummons } from "#coop/coop-resume";
 import { coopSaveServer, isCoopSessionSlot } from "#coop/coop-save";
 import { createCoopTitleOption } from "#coop/coop-title-menu";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-run";
@@ -385,7 +386,7 @@ export class TitlePhase extends Phase {
 
     globalScene.phaseManager.pushNew("EncounterPhase", this.loaded);
 
-    if (this.loaded) {
+    if (this.loaded && !queueCoopResumeSummons()) {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle().length;
 
       globalScene.phaseManager.pushNew("SummonPhase", 0, true, true);
