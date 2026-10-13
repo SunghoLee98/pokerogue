@@ -174,3 +174,12 @@ export function routeCoopSwitch(fieldIndex: number, select: CoopSwitchSelect): C
   });
   return null;
 }
+
+/**
+ * Whether the party may be reordered: not in co-op (spec 4.4). The party order is part of the state both clients
+ * share, so a reorder on one client would split the two games; co-op places each player's pokemon itself at the start
+ * of every wave (see {@linkcode queueCoopFieldSummons}).
+ */
+export function canReorderParty(): boolean {
+  return coopSession === null;
+}

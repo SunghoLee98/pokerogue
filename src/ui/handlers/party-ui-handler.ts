@@ -2,7 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { getPokemonNameWithAffix } from "#app/messages";
-import { wrapCoopPartyFilter } from "#coop/coop-field";
+import { canReorderParty, wrapCoopPartyFilter } from "#coop/coop-field";
 import { allMoves } from "#data/data-lists";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
@@ -1530,7 +1530,7 @@ export class PartyUiHandler extends MessageUiHandler {
         break;
       case PartyUiMode.CHECK:
         this.addCommonOptions(pokemon);
-        if (globalScene.getPlayerParty().length >= 2) {
+        if (globalScene.getPlayerParty().length >= 2 && canReorderParty()) {
           this.options.splice(1, 0, PartyOption.SWITCH);
         }
         if (globalScene.phaseManager.getCurrentPhase().is("SelectModifierPhase")) {
@@ -1791,6 +1791,9 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   private startPartySwitch(startCursor = this.cursor): void {
+    if (!canReorderParty()) {
+      return;
+    }
     this.partySwitchMode = true;
     this.partySwitchCursor = startCursor;
     if (this.partySwitchCursor >= 0) {
@@ -1816,6 +1819,9 @@ export class PartyUiHandler extends MessageUiHandler {
   }
 
   private startPartySwitchSelection(startCursor: number): void {
+    if (!canReorderParty()) {
+      return;
+    }
     this.partySwitchCursor = startCursor;
     if (this.partySwitchCursor >= 0) {
       this.partySlots[this.partySwitchCursor].setTransfer(true);

@@ -1,6 +1,7 @@
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { canReorderParty } from "#coop/coop-field";
 import { getPokeballTintColor } from "#data/pokeball";
 import { BattleType } from "#enums/battle-type";
 import { FieldPosition } from "#enums/field-position";
@@ -25,6 +26,12 @@ export class PartyReorderSwitchPhase extends BattlePhase {
 
   public override async start(): Promise<void> {
     super.start();
+
+    // Co-op places each player's pokemon itself at the start of the wave.
+    if (!canReorderParty()) {
+      this.end();
+      return;
+    }
 
     const party = globalScene.getPlayerParty();
     const isDouble = globalScene.currentBattle.double;
