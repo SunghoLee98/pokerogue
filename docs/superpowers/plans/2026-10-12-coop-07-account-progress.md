@@ -129,22 +129,22 @@ rogueserver/
 - `coopCreditsLocalAccount(pokemon: Pokemon): boolean`
 - `recordCoopPartnerCatch(gameData, pokemon): Promise<boolean> | null` — 상대 포켓몬이면 `setPokemonSeen(pokemon, false)` 후 `false`, 아니면 `null`
 
-- [ ] **Step 1: 실패 테스트** — 솔로는 늘 참. 협동(호스트 클라이언트): 호스트 소유 참, 게스트 소유 거짓, 주인 없는 적 참. 게스트 소유 포켓몬의 `setPokemonCaught`는 `caughtAttr`·`caughtCount`·캔디를 바꾸지 않고 `seenAttr`만 더한다. 내 포켓몬은 솔로처럼 잡음.
-- [ ] **Step 2~4**, **Step 5: 커밋** — `feat(coop): credit a pokemon's catch to its owner's account only`
+- [x] **Step 1: 실패 테스트** — 솔로는 늘 참. 협동(호스트 클라이언트): 호스트 소유 참, 게스트 소유 거짓, 주인 없는 적 참. 게스트 소유 포켓몬의 `setPokemonCaught`는 `caughtAttr`·`caughtCount`·캔디를 바꾸지 않고 `seenAttr`만 더한다. 내 포켓몬은 솔로처럼 잡음.
+- [x] **Step 2~4**, **Step 5: 커밋** — `feat(coop): credit a pokemon's catch to its owner's account only`
 
 ## Task 2: 포획
 
 **Files:** `coop-capture.ts`, `attempt-capture-phase.ts`(두 줄); Test `coop-account.test.ts`
 
-- [ ] **Step 1: 실패 테스트** (GameManager + 가상 파트너) — 호스트 클라이언트에서 게스트가 마스터볼로 잡으면 호스트 계정의 그 종 `caughtCount`·개체값이 그대로, `seenAttr`는 있음. 게스트 클라이언트에서 같은 포획이면 게스트 계정에 "잡음". 호스트 자신이 잡으면 호스트 계정에 "잡음".
-- [ ] **Step 2~4**, **Step 5: 커밋** — `feat(coop): record catches on the thrower's account`
+- [x] **Step 1: 실패 테스트** (GameManager + 가상 파트너) — 호스트 클라이언트에서 게스트가 마스터볼로 잡으면 호스트 계정의 그 종 `caughtCount`·개체값이 그대로, `seenAttr`는 있음. 게스트 클라이언트에서 같은 포획이면 게스트 계정에 "잡음". 호스트 자신이 잡으면 호스트 계정에 "잡음".
+- [x] **Step 2~4**, **Step 5: 커밋** — `feat(coop): record catches on the thrower's account`
 
 ## Task 3: 진화, 우정 캔디, 민트
 
 **Files:** `pokemon.ts`(두 곳), `modifier.ts`(한 곳); Test `coop-account.test.ts`
 
-- [ ] **Step 1: 실패 테스트** — 상대 포켓몬의 `addFriendship`은 친밀도는 올리되 내 `starterData` 캔디 진행·캔디가 그대로, 내 포켓몬은 오름. 상대 포켓몬이 진화하면 내 계정에 진화형 "잡음"·개체값이 없고 "봤음"만. 상대 포켓몬에 민트를 쓰면 내 성격 해금이 없다.
-- [ ] **Step 2~4**, **Step 5: 커밋** — `feat(coop): keep evolution, candy and mint records on the owner's account`
+- [x] **Step 1: 실패 테스트** — 상대 포켓몬의 `addFriendship`은 친밀도는 올리되 내 `starterData` 캔디 진행·캔디가 그대로, 내 포켓몬은 오름. 상대 포켓몬이 진화하면 내 계정에 진화형 "잡음"·개체값이 없고 "봤음"만. 상대 포켓몬에 민트를 쓰면 내 성격 해금이 없다.
+- [x] **Step 2~4**, **Step 5: 커밋** — `feat(coop): keep evolution, candy and mint records on the owner's account`
 
 ## Task 4: ME에서 얻은 포켓몬과 ME 계정 쓰기
 
@@ -155,58 +155,84 @@ rogueserver/
 - `beginCoopEncounterCatchDecision()`: 포획과 같은 결정(`choice capture`), 주인은 역할로
 - `inheritCoopOwner(previous, next)`
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
   - `catchPokemon`(호스트 순번 웨이브): 얻은 포켓몬은 호스트 소유, 호스트 계정에 "잡음". 게스트 순번 웨이브에서 호스트 클라이언트는 "봤음"만.
   - 고른 사람이 3마리면: 고른 사람 클라이언트는 놓아주기 질문, 상대 클라이언트는 결정을 기다려 같은 결과(놓아줌 → 같은 자리에 추가, 또는 안 넣음).
   - 상대가 3마리여도 고른 사람이 3마리 미만이면 바로 들어간다(파티 6마리 미만).
   - GTS 교환·Weird Dream 변신 뒤의 새 포켓몬은 이전 포켓몬 주인 소유.
   - Training Session: 상대 포켓몬이면 내 계정의 성격 해금이 없다.
-- [ ] **Step 2~4**, **Step 5: 커밋** — `feat(coop): give pokemon from encounters to the player who chose`, `feat(coop): keep encounter records on the owner's account`
+- [x] **Step 2~4**, **Step 5: 커밋** — `feat(coop): give pokemon from encounters to the player who chose`, `feat(coop): keep encounter records on the owner's account`
 
 ## Task 5: 알 부화 보류
 
 **Files:** `coop-account.ts`, `egg-lapse-phase.ts`(첫 줄); Test `coop-egg.test.ts`
 
-- [ ] **Step 1: 실패 테스트** — 협동에서 웨이브를 이기면 남은 걸음이 1이던 알이 부화하지 않고(알 목록에 남음, `EggHatchPhase` 없음) 걸음은 줄어든다. 솔로는 부화한다.
-- [ ] **Step 2~4**, **Step 5: 커밋** — `feat(coop): hold egg hatches until the co-op run ends`
+- [x] **Step 1: 실패 테스트** — 협동에서 웨이브를 이기면 남은 걸음이 1이던 알이 부화하지 않고(알 목록에 남음, `EggHatchPhase` 없음) 걸음은 줄어든다. 솔로는 부화한다.
+- [x] **Step 2~4**, **Step 5: 커밋** — `feat(coop): hold egg hatches until the co-op run ends`
 
 ## Task 6: 협동 클리어와 협동 통계
 
 **Files:** Create `coop-records.ts`; Modify `game-stats.ts`, `achv.ts`, `game-over-phase.ts`, `select-starter-phase.ts`; Test `coop-clear.test.ts`
 
-- [ ] **Step 1: 실패 테스트** — 협동 승리 `GameOverPhase`: `COOP_VICTORY`가 열리고 `coopSessionsWon`이 1, `CLASSIC_VICTORY`·`sessionsWon`·리본(`classicWinCount`)·언락·바우처 없음. 솔로 클래식 승리는 그대로. 협동 시작은 `coopSessionsPlayed`만 오르고 `classicSessionsPlayed`는 그대로. 업적 이름은 번역 키가 없으면 기본 문구. 새 통계가 시스템 세이브 왕복(`parseSystemData`)에 남는다.
-- [ ] **Step 2~4**, **Step 5: 커밋** — `feat(coop): count co-op clears apart from classic clears`
+- [x] **Step 1: 실패 테스트** — 협동 승리 `GameOverPhase`: `COOP_VICTORY`가 열리고 `coopSessionsWon`이 1, `CLASSIC_VICTORY`·`sessionsWon`·리본(`classicWinCount`)·언락·바우처 없음. 솔로 클래식 승리는 그대로. 협동 시작은 `coopSessionsPlayed`만 오르고 `classicSessionsPlayed`는 그대로. 업적 이름은 번역 키가 없으면 기본 문구. 새 통계가 시스템 세이브 왕복(`parseSystemData`)에 남는다.
+- [x] **Step 2~4**, **Step 5: 커밋** — `feat(coop): count co-op clears apart from classic clears`
 
 ## Task 7: 협동 기록 탭과 통계 행
 
 **Files:** `coop-records.ts`, `game-over-phase.ts`(항목 한 줄), `run-history-ui-handler.ts`(훅), `game-stats-ui-handler.ts`(행); Test `coop-records.test.ts`
 
-- [ ] **Step 1: 실패 테스트** — 협동 게임 오버의 런 히스토리 항목에 협동 블록(내 역할, 참가자, 소유권, 빈 계정 스냅샷)이 있다. 솔로 항목에는 없다. 런 히스토리 화면은 솔로 탭에서 협동 항목을 빼고, 좌/우로 바꾼 협동 탭에서는 협동 항목만, 모드 줄에 파트너 이름. 통계 화면에 협동 행 2개(기본 문구).
-- [ ] **Step 2~4**, **Step 5: 커밋** — `feat(coop): keep co-op runs in their own run history tab`
+- [x] **Step 1: 실패 테스트** — 협동 게임 오버의 런 히스토리 항목에 협동 블록(내 역할, 참가자, 소유권, 빈 계정 스냅샷)이 있다. 솔로 항목에는 없다. 런 히스토리 화면은 솔로 탭에서 협동 항목을 빼고, 좌/우로 바꾼 협동 탭에서는 협동 항목만, 모드 줄에 파트너 이름. 통계 화면에 협동 행 2개(기본 문구).
+- [x] **Step 2~4**, **Step 5: 커밋** — `feat(coop): keep co-op runs in their own run history tab`
 
 ## Task 8: 백엔드 확인
 
 **Files:** rogueserver `db/savedata.go`, `db/account.go`; Test `db/savedata_test.go`, `db/account_test.go`
 
-- [ ] **Step 1: 실패 테스트** — (순수 함수가 없어 컴파일 실패) 협동 통계·업적이 든 시스템 세이브가 gob 왕복 후 같다. `accountStatColumns`는 협동 통계 키를 빼고 아는 열과 바우처 열만 돌려준다. 숫자가 아닌 값은 오류.
-- [ ] **Step 2~4**, **Step 5: 커밋** — `test(savedata): keep co-op stats and achievements in system saves`
+- [x] **Step 1: 실패 테스트** — (순수 함수가 없어 컴파일 실패) 협동 통계·업적이 든 시스템 세이브가 gob 왕복 후 같다. `accountStatColumns`는 협동 통계 키를 빼고 아는 열과 바우처 열만 돌려준다. 숫자가 아닌 값은 오류.
+- [x] **Step 2~4**, **Step 5: 커밋** — `test(savedata): keep co-op stats and achievements in system saves`
 
 ## Task 9: 인계 정리
 
 **Files:** `coop-input-broker.ts`, `coop-reward.ts`, `coop-banner.ts`, `coop-exit.ts`; Test `coop-wait-button.test.ts`, `coop-exit.test.ts`
 
-- [ ] **Step 1: 실패 테스트** — 순번이 아닌 쪽 보상 화면에서 대기 버튼이 보이고 메뉴 키 두 번이면 세이브 후 나가기, 화면이 닫히면 버튼이 사라진다. 순번인 쪽에는 없다. 끊김 배너는 다른 화면 앞(UI 컨테이너 맨 위)에 있다.
-- [ ] **Step 2~4**, **Step 5: 커밋** — `feat(coop): offer save and quit to the player waiting on the reward screen`, `fix(coop): show the connection notice above other screens`
+- [x] **Step 1: 실패 테스트** — 순번이 아닌 쪽 보상 화면에서 대기 버튼이 보이고 메뉴 키 두 번이면 세이브 후 나가기, 화면이 닫히면 버튼이 사라진다. 순번인 쪽에는 없다. 끊김 배너는 다른 화면 앞(UI 컨테이너 맨 위)에 있다.
+- [x] **Step 2~4**, **Step 5: 커밋** — `feat(coop): offer save and quit to the player waiting on the reward screen`, `fix(coop): show the connection notice above other screens`
 
 ## Task 10: 기록-재생과 변이 확인
 
 **Files:** Test `coop-account-replay.test.ts`
 
-- [ ] **Step 1** — 시나리오: 게스트가 첫 턴에 마스터볼로 잡고 두 웨이브를 진행(우정 캔디 포함). 호스트·게스트 해시와 입력이 같고, 호스트 계정에는 그 종이 "봤음"만, 게스트 계정에는 "잡음". 반대로 호스트가 잡는 시나리오도 같다.
-- [ ] **Step 2: 변이 확인** — `setPokemonCaught` 훅, 포획 주인 등록, 개체값 조건, 우정 캔디 조건, ME 주인 등록·한도, 소유권 승계, 알 부화 훅, 협동 클리어 분기, 시작 횟수, 런 히스토리 탭 필터, 대기 잡기를 하나씩 끄고 해당 테스트가 실패하는지 확인
+- [x] **Step 1** — 시나리오: 게스트가 첫 턴에 마스터볼로 잡고 두 웨이브를 진행(우정 캔디 포함). 호스트·게스트 해시와 입력이 같고, 호스트 계정에는 그 종이 "봤음"만, 게스트 계정에는 "잡음". 반대로 호스트가 잡는 시나리오도 같다.
+- [x] **Step 2: 변이 확인** — `setPokemonCaught` 훅, 포획 주인 등록, 개체값 조건, 우정 캔디 조건, ME 주인 등록·한도, 소유권 승계, 알 부화 훅, 협동 클리어 분기, 시작 횟수, 런 히스토리 탭 필터, 대기 잡기를 하나씩 끄고 해당 테스트가 실패하는지 확인
 
 ## Task 11: 마무리
 
-- [ ] **Step 1:** `pnpm test test/tests/coop && pnpm typecheck && pnpm biome:ci && pnpm ls-lint`, 백엔드 `go test ./...`, `go vet ./...`
-- [ ] **Step 2: 화면 확인 (선택)** — 오프라인 두 창: 런 히스토리 협동 탭, 통계 화면 협동 행. 스크린샷 `coop-screens-stage7/`
-- [ ] **Step 3:** "구현 메모" 추가, 체크박스 갱신, 커밋 — `docs: mark co-op account progress plan progress`
+- [x] **Step 1:** `pnpm test test/tests/coop && pnpm typecheck && pnpm biome:ci && pnpm ls-lint`, 백엔드 `go test ./...`, `go vet ./...`
+- [ ] **Step 2: 화면 확인 (선택, 하지 않음)** — 오프라인 두 창: 런 히스토리 협동 탭, 통계 화면 협동 행. 스크린샷 `coop-screens-stage7/`
+- [x] **Step 3:** "구현 메모" 추가, 체크박스 갱신, 커밋 — `docs: mark co-op account progress plan progress`
+
+---
+
+## 구현 메모 (계획과 달라진 점)
+
+구현하면서 정한 것과 새로 알게 된 부분이다. 8단계 이후 계획은 이 내용을 기준으로 작성한다.
+
+1. **계정 기록 규칙(`coopCreditsLocalAccount`)**: 소유권 표에 주인이 있으면 주인이 나일 때만, 주인이 없으면 적(세계 단위)이라 참, 주인 없는 파티 포켓몬은 호스트 것으로 본다(4단계 규칙과 같음). 종 번호만 받는 `GameData` 함수(`updateSpeciesDexIvs`, `addStarterCandy`, `setEggMoveUnlocked`, `unlockSpeciesNature`, `abilityAttr`)는 안에서 포켓몬을 알 수 없어서 호출부에 조건을 달았다. 포켓몬을 받는 `setPokemonCaught`만 함수 첫 줄 훅으로 처리한다.
+2. **상대 포켓몬은 "봤음"만 (설계자 판단)**: 상대 포켓몬의 `setPokemonCaught`는 `setPokemonSeen(pokemon, false)`만 한다. 그 폼·이로치는 봤음으로 남지만 본 횟수는 늘리지 않는다(적으로 만났을 때 이미 셈). 진화·폼 변경의 "잡음" 갱신도 같은 훅을 지난다.
+3. **잡는 순간 주인 등록**: `AttemptCapturePhase.catch` 첫 줄에서 적 포켓몬 id에 던진 사람을 등록한다. `addToParty`가 같은 id를 이어받으므로 `setPokemonCaught(적)`부터 주인 기준이 된다. 놓아준 포켓몬의 등록은 남지만 `countOwnedBy`는 파티만 센다.
+4. **업적은 그대로 (설계자 판단, 확인 필요)**: 스펙 3.7 "런 도중 업적은 각자 계정에 그대로"를 문자 그대로 따라, 포획·레벨·이로치 업적은 두 클라이언트가 같은 사건을 보고 각자 받는다. 상대가 전설을 잡아도 내 계정에 "전설 포획" 업적이 열린다. 예외는 최대 우정 업적(`MAX_FRIENDSHIP`)과 우정 리본으로, 우정 캔디와 같은 계정 쓰기 블록 안에 있어 주인만 받는다. 포획 업적도 던진 사람만 받게 하려면 `catch`·`catchPokemon`의 업적 4줄에 같은 조건을 달면 된다.
+5. **통계 (설계자 판단)**: `pokemonCaught`·`pokemonHatched` 같은 포획 통계는 `setPokemonCaught` 안이라 주인만, `battles`·`pokemonDefeated`·`highestLevel`·`highestDamage` 등은 둘 다 겪은 일이라 그대로 둘 다 올린다.
+6. **ME에서 얻은 포켓몬**: `catchPokemon`(Salesman, Uncommon Breed, Dancing Lessons, Absolute Avarice 등)은 첫 줄에서 그 웨이브 순번(ME 선택지를 고른 사람)을 주인으로 등록하고, "가득 참"을 고른 사람 3마리로 판정한다. 놓아주기 결정은 포획과 같은 `CoopCaptureDecision`(`choice capture`)을 쓴다(생성자가 포켓몬 id 대신 역할을 받도록 바꿈). 상대가 3마리여도 고른 사람에게 자리가 있으면 바로 들어간다.
+7. **소유권 승계**: GTS 교환(두 선택지)과 Weird Dream 변신은 새 `PlayerPokemon`을 만들어 id가 바뀐다. 이전 포켓몬 주인을 그대로 넘긴다(`inheritCoopOwner`). 이전에는 새 포켓몬이 주인 없음 → 호스트 것으로 취급되어 3마리 배분이 깨졌다(5단계에서 놓친 부분). Weird Dream은 변신 목록을 만드는 곳(`getTeamTransformations`)에서 넘기므로 계정 기록(개체값·잡음·캔디·알 기술)도 주인 기준이 된다.
+8. **알 부화 보류 (스펙과 다름, 확인 필요)**: `EggLapsePhase.start` 첫 줄에서 협동이면 남은 걸음만 1씩 줄이고(0 아래로는 안 내려감) 부화하지 않는다. 스펙은 "타이틀로 돌아갈 때 각자 부화"인데, 부화 연출(`EggHatchPhase`, 알 부화 화면)은 런 화면을 전제로 해서 타이틀에서 돌리기 어렵다. 대신 걸음이 다 된 알은 **다음 솔로 런에서 처음 이긴 웨이브**에 부화한다(원래 코드가 `hatchWaves < 1`인 알을 모두 부화시키므로 따로 할 일이 없음). 타이틀 부화가 꼭 필요하면 후속 과제.
+9. **협동 클리어**: `GameOverPhase`의 클래식 분기 조건을 `isClassic && !awardCoopVictory()`로 바꿨다. 협동이면 `COOP_VICTORY` 업적과 `coopSessionsWon++`만 하고 클래식 업적·`sessionsWon`·첫 클리어 리본(`classicWinCount`)·리본을 건너뛴다. 협동은 `newclear` 대신 `false`로 진행해서 `handleUnlocks`(엔드리스·스플라이스드 엔드리스·미니 블랙홀·진화의휘석)와 첫 클리어 바우처도 없다. 엔딩 대화와 엔드 카드는 그대로 나온다. 두 클라이언트가 각자 자기 계정에 받는다.
+10. **협동 클리어 업적**: `achvs.COOP_VICTORY`(목록 맨 끝, 점수 250 = 클래식 클리어와 같음, 아이콘 `linking_cord`(연결의끈), 조건 없음, 바우처 없음). 번역 키는 locales에 넣지 않고 `withCoopAchvText`가 인스턴스의 `name`/`description`을 `coopText`(한국어 "협동 챔피언" / 영어 "Co-op Champions")로 바꿔 준다(`achv.ts`가 `coop-text`만 import하므로 순환 import 없음).
+11. **협동 통계 (설계자 판단)**: 협동 시작은 `classicSessionsPlayed` 대신 `coopSessionsPlayed`를 올린다(3단계 메모 12번의 결정). 이어하기는 솔로와 같이 세지 않는다. `GameStats`에 `coopSessionsPlayed`, `coopSessionsWon`을 더했고(필드 2개), 통계 화면에 "협동 런", "협동 클리어" 행을 일일 런 다음에 넣었다(`DisplayStat.label`로 번역 키 없이 문구 지정).
+12. **협동 기록 탭**: 런 히스토리 항목에 협동 블록을 붙인다(계정 스냅샷의 도감·알 기술·언락 목록은 비워 크기를 줄이고, 내 역할 `localRole`을 더함). 런 히스토리 화면은 솔로 탭으로 열리고 좌/우 키로 협동 탭과 바꾼다. 오른쪽 위에 "< 솔로 기록 >"/"< 협동 기록 >", 협동 항목의 모드 줄은 "협동: 파트너 이름(8자까지) - 웨이브 N". 파티 아이콘은 6마리 전체(양쪽 파티)를 원래 순서로 보여 주고 주인 표시는 없다. 솔로와 협동 항목이 합쳐서 25개 한도를 나눠 쓴다. 테스트용 `MockText`에 `appendText`를 더했다(헤드리스에서 런 히스토리 항목을 만들기 위해).
+13. **백엔드**: 동작 변경은 없다. `GameStats`가 형식 없는 값이라 새 통계 키가 그대로 저장되고, `accountStats` 표는 아는 열만 쓴다(모르는 키는 건너뜀, 숫자가 아니면 저장 전체가 실패하므로 협동 통계는 숫자). DB 없이 시험하려고 시스템 세이브 gob 인코드·디코드(`encodeSystemSaveData`/`decodeSystemSaveData`)와 열 고르기(`accountStatColumns`)를 순수 함수로 떼고 Go 테스트 3개를 더했다. 커밋 `197bb9f`.
+14. **보상 화면 대기 버튼**: 순번이 아닌 쪽이 보상 화면을 여는 동안 중개자에 대기 하나를 잡는다(`holdWait`). 그래서 메뉴 키는 일반 메뉴 대신 "세이브 후 나가기"(두 번 누름)가 되고, 화면이 닫히면(그 `SelectModifierPhase`의 `end`) 놓는다. 순번이 아닌 쪽도 상점·파티 확인은 그대로 쓸 수 있다.
+15. **끊김 배너**: 재접속 카운트다운과 종료 문구는 다른 화면 앞에 그린다(`showCoopBanner(text, false, true)`). 차례·핑 배너는 기존처럼 뒤에 둔다.
+16. **결정론**: 계정 쓰기는 로컬 `gameData`만 바꾸고, 시뮬레이션은 런 시작 스냅샷을 읽으므로 해시에 영향이 없다. 새 스타터 추가 문구는 잡은 쪽 화면에만 뜨지만 상태는 같다. 기록-재생 `coop-account-replay.test.ts`: 게스트가 잡는 경우·호스트가 잡는 경우 각각 해시와 입력이 같고, 잡은 쪽 계정만 "잡음"·잡은 횟수 1, 상대는 "봤음"만, 우정 캔디 진행은 각 스타터 주인 계정에만 쌓인다.
+17. **변이 확인**: `setPokemonCaught` 훅 → 5개, 잡는 순간 주인 등록 → 3개, 포획 개체값 조건 → 1개, 우정 조건 → 2개(재생 포함), 진화 개체값 → 1개, 민트 → 1개, ME 주인 등록 → 3개, ME 한도 → 3개, ME 개체값 → 1개(처음엔 0개라 테스트를 보강), GTS 승계 → 1개, Weird Dream 승계 → 1개, Training Session 성격 → 1개, 알 부화 훅 → 1개, 협동 클리어 분기 → 1개, 협동 `newclear=false` → 1개, 시작 횟수 → 1개, 기록 항목 → 2개, 탭 필터 → 1개, 보상 대기 → 2개, 배너 앞 → 1개 실패.
+18. **시험하지 않은 것**: Training Session의 개체값·특성 해금 조건(성격 해금만 시험), Weird Dream의 알 기술 해금(캔디·잡은 횟수로 시험), 실제 두 창 화면 확인(이번 단계는 하지 않음, 런 히스토리 탭 글자 위치는 눈으로 보지 않았다), 실제 rogueserver(MariaDB)에 협동 통계 저장.
+19. **남은 것 (후속)**: 타이틀에서 알 부화(8번), 포획 업적을 던진 사람만 받게 할지(4번), 재동기화(호스트 상태 전송), 런 히스토리 협동 항목에서 주인별 파티 구분, 대기 버튼과 배너의 세밀한 배치.
