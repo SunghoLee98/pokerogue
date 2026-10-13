@@ -1,9 +1,9 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { speciesEggMoves } from "#balance/moves/egg-moves";
-import { assembleCoopParty, beginCoopSession, COOP_SESSION_SLOT, createCoopGameMode } from "#coop/coop-game-start";
+import { assembleCoopParty, beginCoopSession, createCoopGameMode } from "#coop/coop-game-start";
 import type { CoopAccountSnapshot, CoopRole, CoopStarterPayload } from "#coop/coop-protocol";
-import { coopSession, setCoopSession } from "#coop/coop-session";
+import { COOP_SESSION_SLOT, coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import { computeCoopStateHash } from "#coop/coop-state-hash";
 import type { CoopTransport } from "#coop/coop-transport";

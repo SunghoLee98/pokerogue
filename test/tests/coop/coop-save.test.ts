@@ -1,10 +1,9 @@
 import { pokerogueApi } from "#api/api";
 import { getSessionDataLocalStorageKey, loggedInUser } from "#app/account";
 import * as appConstants from "#constants/app-constants";
-import { COOP_SESSION_SLOT } from "#coop/coop-game-start";
 import { COOP_PROTOCOL_VERSION, type CoopAccountSnapshot, type CoopRole } from "#coop/coop-protocol";
 import { coopSaveServer, isCoopSlotRangeError, normalizeCoopSaveData } from "#coop/coop-save";
-import { coopSession, setCoopSession } from "#coop/coop-session";
+import { COOP_SESSION_SLOT, coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";

@@ -6,10 +6,9 @@
 import { pokerogueApi } from "#api/api";
 import { clientSessionId } from "#app/account";
 import { bypassLogin } from "#constants/app-constants";
-import { COOP_SESSION_SLOT } from "#coop/coop-game-start";
 import { COOP_PROTOCOL_VERSION, type CoopAccountSnapshot, type CoopRole } from "#coop/coop-protocol";
 import { getCoopRewardCounters } from "#coop/coop-reward";
-import { type CoopSession, coopSession } from "#coop/coop-session";
+import { COOP_SESSION_SLOT, type CoopSession, coopSession } from "#coop/coop-session";
 import type { GameData } from "#system/game-data";
 
 /** What a co-op run saves besides the solo session fields. Only the host's account keeps the save. */

@@ -75,6 +75,27 @@ const COOP_TEXT = {
     en: "You are not the partner saved with this run.",
     ko: "이 협동 세이브의 파트너 계정이 아닙니다.",
   },
+  partnerReconnecting: {
+    en: "Lost the connection to your partner. Waiting for them to reconnect... ({{seconds}}s)",
+    ko: "파트너와 연결이 끊겼습니다. 재접속을 기다리는 중... ({{seconds}}초)",
+  },
+  connectionLost: {
+    en: "Your partner did not come back. Returning to the title screen.",
+    ko: "파트너와 다시 연결되지 않았습니다. 타이틀로 돌아갑니다.",
+  },
+  partnerLeftRun: {
+    en: "Your partner left. Returning to the title screen.",
+    ko: "파트너가 나갔습니다. 타이틀로 돌아갑니다.",
+  },
+  partnerSavedAndQuit: {
+    en: "Your partner chose save and quit. Returning to the title screen.",
+    ko: "파트너가 세이브 후 나갔습니다. 타이틀로 돌아갑니다.",
+  },
+  savingAndQuitting: { en: "Saving and quitting...", ko: "세이브 후 나가는 중..." },
+  desyncDetected: {
+    en: "The two games no longer match. Saving and returning to the title screen.",
+    ko: "두 게임의 상태가 달라졌습니다. 세이브 후 타이틀로 돌아갑니다.",
+  },
   fleeDeclined: { en: "Your partner did not agree to flee.", ko: "파트너가 도망에 동의하지 않았습니다." },
 } as const satisfies Record<string, { en: string; ko: string }>;
 

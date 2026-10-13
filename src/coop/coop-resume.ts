@@ -8,13 +8,13 @@
 
 import { globalScene } from "#app/global-scene";
 import { type CoopConnection, type CoopLocalInfo, getLocalCoopInfo, hostCoop } from "#coop/coop-connect";
+import { watchCoopConnection } from "#coop/coop-exit";
 import { arrangeCoopParty } from "#coop/coop-field";
-import { COOP_SESSION_SLOT } from "#coop/coop-game-start";
 import { CoopOwnership } from "#coop/coop-ownership";
 import type { CoopRole } from "#coop/coop-protocol";
 import { restoreCoopRewardCounters } from "#coop/coop-reward";
 import { normalizeCoopSaveData } from "#coop/coop-save";
-import { CoopSession, coopSession, setCoopSession } from "#coop/coop-session";
+import { COOP_SESSION_SLOT, CoopSession, coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopTransport, Unsubscribe } from "#coop/coop-transport";
 import type { SessionSaveData } from "#types/save-data";
 
@@ -43,6 +43,7 @@ export async function resumeCoopRun(role: CoopRole, transport: CoopTransport, se
   session.participants = { ...coop.participants };
   session.restoreDecisionCount(coop.decisionSeq);
   setCoopSession(session);
+  watchCoopConnection(transport);
   restoreCoopRewardCounters(session, { gen: coop.rewardGen, seq: coop.rewardSeq });
 
   globalScene.sessionSlotId = COOP_SESSION_SLOT;

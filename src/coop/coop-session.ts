@@ -9,6 +9,12 @@ import { CoopOwnership } from "#coop/coop-ownership";
 import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
 import type { CoopTransport } from "#coop/coop-transport";
 
+/**
+ * The session slot a co-op run saves to, apart from the solo slots 0-4 (spec 4.6).
+ * Only the host saves there, and only a save server with the co-op slot accepts it.
+ */
+export const COOP_SESSION_SLOT = 5;
+
 export class CoopSession {
   readonly localRole: CoopRole;
   readonly transport: CoopTransport;

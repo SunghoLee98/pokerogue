@@ -9,7 +9,8 @@
 import { globalScene } from "#app/global-scene";
 import type { CoopDecision, CoopMessage, CoopRole, CoopTurnCommandPayload } from "#coop/coop-protocol";
 import type { CoopTransport } from "#coop/coop-transport";
-import { createLoopbackPair } from "#coop/loopback-transport";
+import { createLoopbackPair, type LoopbackPair } from "#coop/loopback-transport";
+import { ReliableCoopTransport } from "#coop/reliable-coop-transport";
 import type { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import type { MoveId } from "#enums/move-id";
@@ -87,11 +88,19 @@ export class CoopTestPartner {
   private readonly transport: CoopTransport;
   private readonly listeners = new Set<(message: CoopMessage) => void>();
 
-  /** @param localRole - The role of the client under test; the partner plays the other one */
-  constructor(localRole: CoopRole) {
+  private readonly pair: LoopbackPair;
+
+  /**
+   * @param localRole - The role of the client under test; the partner plays the other one
+   * @param reliable - Wrap both ends the way a real connection is wrapped, resending what a dropped connection lost
+   */
+  constructor(localRole: CoopRole, { reliable = false }: { reliable?: boolean } = {}) {
     const pair = createLoopbackPair();
-    this.localTransport = pair[localRole];
-    this.transport = pair[localRole === "host" ? "guest" : "host"];
+    this.pair = pair;
+    const local = pair[localRole];
+    const remote = pair[localRole === "host" ? "guest" : "host"];
+    this.localTransport = reliable ? new ReliableCoopTransport(local) : local;
+    this.transport = reliable ? new ReliableCoopTransport(remote) : remote;
     this.transport.onMessage(message => {
       this.received.push(message);
       for (const listener of [...this.listeners]) {
@@ -108,6 +117,21 @@ export class CoopTestPartner {
 
   send(message: CoopMessage): void {
     this.transport.send(message);
+  }
+
+  /** Break the connection: both ends report `"reconnecting"` and messages are lost until {@linkcode restore}. */
+  drop(): void {
+    this.pair.drop();
+  }
+
+  /** Reconnect both ends. */
+  restore(): void {
+    this.pair.restore();
+  }
+
+  /** The partner's client goes away for good. */
+  close(): void {
+    this.transport.close();
   }
 
   /** Send the partner's command for the current turn. */

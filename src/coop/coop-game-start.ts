@@ -12,19 +12,14 @@
 
 import { type GameMode, getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import { watchCoopConnection } from "#coop/coop-exit";
 import type { CoopRole } from "#coop/coop-protocol";
-import { CoopSession, setCoopSession } from "#coop/coop-session";
+import { COOP_SESSION_SLOT, CoopSession, setCoopSession } from "#coop/coop-session";
 import { createStarterFromPayload } from "#coop/coop-starter-payload";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import type { CoopTransport } from "#coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 import type { PlayerPokemon } from "#field/pokemon";
-
-/**
- * The session slot a co-op run saves to, apart from the solo slots 0-4 (spec 4.6).
- * Until the backend accepts it, saves to it fail without touching any solo slot.
- */
-export const COOP_SESSION_SLOT = 5;
 
 /** Co-op is classic with the `isCoop` flag; there is no `GameModes` entry for it. */
 export function createCoopGameMode(): GameMode {
@@ -46,6 +41,7 @@ export function beginCoopSession(
   session.timedEvent = start.timedEvent;
   session.participants = { ...participants };
   setCoopSession(session);
+  watchCoopConnection(transport);
   return session;
 }
 

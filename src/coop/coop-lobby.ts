@@ -6,9 +6,10 @@
 
 import { globalScene } from "#app/global-scene";
 import { type CoopConnection, getLocalCoopInfo } from "#coop/coop-connect";
-import { COOP_SESSION_SLOT, startCoopRun } from "#coop/coop-game-start";
+import { registerCoopLobbyExit, watchCoopConnection } from "#coop/coop-exit";
+import { startCoopRun } from "#coop/coop-game-start";
 import type { CoopRole } from "#coop/coop-protocol";
-import { coopSession, setCoopSession } from "#coop/coop-session";
+import { COOP_SESSION_SLOT, coopSession, setCoopSession } from "#coop/coop-session";
 import { createAccountSnapshot } from "#coop/coop-sim-data";
 import { CoopStarterSelection, type CoopStarterSelectionOptions } from "#coop/coop-starter-selection";
 import type { CoopTransport } from "#coop/coop-transport";
@@ -22,6 +23,9 @@ export interface CoopLobby {
 
 /** The lobby while co-op players pick their starters, or `null`. */
 export let coopLobby: CoopLobby | null = null;
+
+// The exit code ends runs and lobbies alike; it learns about the lobby from here to keep the imports one-way.
+registerCoopLobbyExit({ transport: () => coopLobby?.transport ?? null, leave: () => leaveCoop() });
 
 /**
  * Enter the lobby after connecting.
@@ -38,6 +42,7 @@ export function openCoopLobby(
     peerAccountName: connection.peerAccountName,
     selection: new CoopStarterSelection(connection.role, connection.transport, options),
   };
+  watchCoopConnection(connection.transport);
   return coopLobby;
 }
 
@@ -47,7 +52,8 @@ export function openCoopLobby(
  */
 export function leaveCoop(): void {
   // A solo run must never save into the co-op slot.
-  if (globalScene.sessionSlotId === COOP_SESSION_SLOT) {
+  // `globalScene` is unset before the game starts.
+  if (globalScene?.sessionSlotId === COOP_SESSION_SLOT) {
     globalScene.sessionSlotId = 0;
   }
   const transports = new Set<CoopTransport>();
