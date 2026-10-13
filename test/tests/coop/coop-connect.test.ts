@@ -205,6 +205,7 @@ describe("co-op run from the lobby", () => {
     expect(coopLobby).toBeNull();
     expect(coopSession?.localRole).toBe("host");
     expect(coopSession?.transport).toBe(pair.host);
+    expect(coopSession?.participants).toEqual({ host: "Guest", guest: "Guesty" });
     expect(game.scene.getPlayerParty().map(p => p.species.speciesId)).toEqual([
       SpeciesId.BULBASAUR,
       SpeciesId.CHARMANDER,

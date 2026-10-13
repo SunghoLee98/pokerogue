@@ -5,7 +5,7 @@
  */
 
 import { globalScene } from "#app/global-scene";
-import type { CoopConnection } from "#coop/coop-connect";
+import { type CoopConnection, getLocalCoopInfo } from "#coop/coop-connect";
 import { startCoopRun } from "#coop/coop-game-start";
 import type { CoopRole } from "#coop/coop-protocol";
 import { coopSession, setCoopSession } from "#coop/coop-session";
@@ -75,5 +75,10 @@ export function startCoopRunFromLobby(initBattle: () => void): Promise<void> {
   }
   lobby.selection.dispose();
   coopLobby = null;
-  return startCoopRun(lobby.role, lobby.transport, start, initBattle);
+  const localName = getLocalCoopInfo().accountName;
+  const participants =
+    lobby.role === "host"
+      ? { host: localName, guest: lobby.peerAccountName }
+      : { host: lobby.peerAccountName, guest: localName };
+  return startCoopRun(lobby.role, lobby.transport, start, initBattle, participants);
 }

@@ -128,6 +128,22 @@ export function openCoopRewardScreen(phase: SelectModifierPhase): void {
   pump(state);
 }
 
+/** The reward counters a co-op save keeps: the newest screen's number and how many events were applied. */
+export function getCoopRewardCounters(session: CoopSession): { gen: number; seq: number } {
+  const state = states.get(session);
+  return { gen: state?.gen ?? -1, seq: state?.nextApply ?? 0 };
+}
+
+/**
+ * Continue a saved run's reward counters. Saves are made at the start of a wave, when every event was applied.
+ */
+export function restoreCoopRewardCounters(session: CoopSession, counters: { gen: number; seq: number }): void {
+  const state = getState(session);
+  state.gen = counters.gen;
+  state.nextApply = counters.seq;
+  state.nextSeq = counters.seq;
+}
+
 /** The number of the newest reward screen opened in this session, `-1` before the first. */
 export function getCoopRewardGen(): number {
   return coopSession ? (states.get(coopSession)?.gen ?? -1) : -1;

@@ -151,6 +151,8 @@ export interface CoopBattleStartOptions {
   start: CoopStartInfo;
   /** The connection to the partner. Default: one side of a fresh loopback pair */
   transport?: CoopTransport;
+  /** Both players' account names */
+  participants?: Record<CoopRole, string>;
 }
 
 /**
@@ -234,7 +236,13 @@ async function toCoopEncounterPhase(
     game.scene.gameMode = createCoopGameMode();
     const selectStarterPhase = new SelectStarterPhase();
     game.scene.phaseManager.pushNew("EncounterPhase", false);
-    await startCoopRun(options.role, transport, options.start, () => selectStarterPhase.initBattle([]));
+    await startCoopRun(
+      options.role,
+      transport,
+      options.start,
+      () => selectStarterPhase.initBattle([]),
+      options.participants,
+    );
   });
   afterTitlePrompt?.();
 

@@ -17,6 +17,8 @@ export class CoopSession {
   readonly inputs: CoopInputBroker;
   /** The host's active timed event when the run started (`null` for none). Both clients use it instead of the clock. */
   timedEvent: string | null = null;
+  /** Both players' account names, saved with the run (spec 3.8) */
+  participants: Record<CoopRole, string> = { host: "", guest: "" };
   private readonly accountSnapshots = new Map<CoopRole, CoopAccountSnapshot>();
   private decisionSeq = 0;
 
@@ -33,6 +35,16 @@ export class CoopSession {
    */
   nextDecisionSeq(): number {
     return this.decisionSeq++;
+  }
+
+  /** The number the next decision will get, saved with the run. */
+  get decisionCount(): number {
+    return this.decisionSeq;
+  }
+
+  /** Continue numbering decisions from a saved run. */
+  restoreDecisionCount(count: number): void {
+    this.decisionSeq = count;
   }
 
   get remoteRole(): CoopRole {

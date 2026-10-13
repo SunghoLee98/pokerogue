@@ -33,12 +33,18 @@ export function createCoopGameMode(): GameMode {
   return gameMode;
 }
 
-/** Open the co-op session with both players' account snapshots and the host's timed event. */
-export function beginCoopSession(role: CoopRole, transport: CoopTransport, start: CoopStartInfo): CoopSession {
+/** Open the co-op session with both players' account snapshots and names, and the host's timed event. */
+export function beginCoopSession(
+  role: CoopRole,
+  transport: CoopTransport,
+  start: CoopStartInfo,
+  participants: Record<CoopRole, string> = { host: "", guest: "" },
+): CoopSession {
   const session = new CoopSession(role, transport);
   session.setAccountSnapshot("host", start.accounts.host);
   session.setAccountSnapshot("guest", start.accounts.guest);
   session.timedEvent = start.timedEvent;
+  session.participants = { ...participants };
   setCoopSession(session);
   return session;
 }
@@ -61,14 +67,16 @@ export function assembleCoopParty(start: CoopStartInfo, level: number): PlayerPo
  * create the party and load it,
  * then hand over to the rest of the solo start (`SelectStarterPhase.initBattle` with no further starters).
  * @param initBattle - Continues the solo start with the party already in place
+ * @param participants - Both players' account names, saved with the run
  */
 export async function startCoopRun(
   role: CoopRole,
   transport: CoopTransport,
   start: CoopStartInfo,
   initBattle: () => void,
+  participants?: Record<CoopRole, string>,
 ): Promise<void> {
-  beginCoopSession(role, transport, start);
+  beginCoopSession(role, transport, start, participants);
   globalScene.sessionSlotId = COOP_SESSION_SLOT;
   // Money is part of the shared state; set it here rather than rely on what each client's screen did.
   globalScene.money = globalScene.gameMode.getStartingMoney();
