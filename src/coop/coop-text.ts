@@ -65,6 +65,16 @@ const COOP_TEXT = {
   waitingForOwner: { en: "Waiting for your partner to allow it...", ko: "파트너의 허락을 기다리는 중..." },
   ownerDeclined: { en: "Your partner did not allow it.", ko: "파트너가 허락하지 않았습니다." },
   partnerPinged: { en: "Your partner suggests this one!", ko: "파트너: 이거 골라줘!" },
+  continueGame: { en: "Continue", ko: "이어하기" },
+  loadingSavedRun: { en: "Loading the saved run...", ko: "저장된 협동 런을 불러오는 중..." },
+  wrongPartnerJoined: {
+    en: "Another account joined. Only the saved partner can continue this run.",
+    ko: "다른 계정이 들어왔습니다. 저장된 파트너만 이어할 수 있습니다.",
+  },
+  notTheSavedPartner: {
+    en: "You are not the partner saved with this run.",
+    ko: "이 협동 세이브의 파트너 계정이 아닙니다.",
+  },
   fleeDeclined: { en: "Your partner did not agree to flee.", ko: "파트너가 도망에 동의하지 않았습니다." },
 } as const satisfies Record<string, { en: string; ko: string }>;
 

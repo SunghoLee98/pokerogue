@@ -206,6 +206,10 @@ export class TitlePhase extends Phase {
           globalScene.phaseManager.toTitleScreen();
           super.end();
         },
+        onResumed: () => {
+          this.loaded = true;
+          this.end();
+        },
       });
       options.splice(options.findIndex(o => o.label === i18next.t("menu:newGame")) + 1, 0, coopOption);
     }

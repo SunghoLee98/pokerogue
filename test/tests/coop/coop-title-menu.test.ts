@@ -9,6 +9,7 @@ import { createLoopbackPair } from "#coop/loopback-transport";
 import { CoopRelayError } from "#coop/relay-websocket-transport";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
+import { waitForCoop } from "#test/utils/coop-partner";
 import type { ModalConfig, OptionSelectItem } from "#types/ui-types";
 import type { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
 import i18next from "i18next";
@@ -64,6 +65,11 @@ describe("co-op title menu", () => {
     return (game.scene.ui.getHandler() as OptionSelectUiHandler)["options"];
   }
 
+  /** The co-op menu opens once the co-op save slot has been read. */
+  async function coopMenuShown(): Promise<void> {
+    await waitForCoop(() => currentOptions().some(o => o.label === coopText("joinGame")));
+  }
+
   function choose(label: string): void {
     const option = currentOptions().find(o => o.label === label);
     expect(option, `option "${label}"`).toBeDefined();
@@ -104,6 +110,7 @@ describe("co-op title menu", () => {
     await game.runToTitle();
 
     choose(coopText("coopPlay"));
+    await coopMenuShown();
     choose(coopText("hostGame"));
     await flush();
 
@@ -132,6 +139,7 @@ describe("co-op title menu", () => {
     await game.runToTitle();
 
     choose(coopText("coopPlay"));
+    await coopMenuShown();
     choose(coopText("joinGame"));
     const formCall = setOverlayMode.mock.calls.find(([mode]) => mode === UiMode.COOP_JOIN_FORM);
     expect(formCall).toBeDefined();
@@ -149,6 +157,7 @@ describe("co-op title menu", () => {
     vi.spyOn(coopTransportFactory, "createTransport").mockReturnValue(pair.host);
     await game.runToTitle();
     choose(coopText("coopPlay"));
+    await coopMenuShown();
     choose(coopText("hostGame"));
     await flush();
     await joinCoop("LOOP00", { createTransport: () => pair.guest, local: getLocalCoopInfo() });
