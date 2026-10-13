@@ -1,6 +1,8 @@
+import { loggedInUser, updateUserInfo } from "#app/account";
 import { getLocalCoopInfo, joinCoop } from "#coop/coop-connect";
 import { CoopVersionMismatchError } from "#coop/coop-handshake";
 import { coopLobby, leaveCoop } from "#coop/coop-lobby";
+import { coopSaveServer } from "#coop/coop-save";
 import { coopText } from "#coop/coop-text";
 import { coopTransportFactory, describeCoopError } from "#coop/coop-title-menu";
 import { createLoopbackPair } from "#coop/loopback-transport";
@@ -72,6 +74,21 @@ describe("co-op title menu", () => {
     await game.runToTitle();
     expect(game.scene.ui.mode).toBe(UiMode.TITLE);
     expect(currentOptions().map(o => o.label)).not.toContain(coopText("coopPlay"));
+  });
+
+  it("a save server without the co-op slot hides co-op", async () => {
+    vi.spyOn(coopSaveServer, "supportsCoop").mockResolvedValue(false);
+    await game.runToTitle();
+    expect(currentOptions().map(o => o.label)).not.toContain(coopText("coopPlay"));
+  });
+
+  it("never continues the co-op slot as a solo run", async () => {
+    await updateUserInfo();
+    loggedInUser!.lastSessionSlot = 5;
+    const getSession = vi.spyOn(game.scene.gameData, "getSession");
+    await game.runToTitle();
+    expect(getSession).not.toHaveBeenCalledWith(5);
+    expect(currentOptions().map(o => o.label)).not.toContain(i18next.t("menu:continue"));
   });
 
   it("shows co-op after new game with a relay url", async () => {

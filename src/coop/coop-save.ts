@@ -3,7 +3,10 @@
  * @module
  */
 
+import { pokerogueApi } from "#api/api";
+import { clientSessionId } from "#app/account";
 import { bypassLogin } from "#constants/app-constants";
+import { COOP_SESSION_SLOT } from "#coop/coop-game-start";
 import { COOP_PROTOCOL_VERSION, type CoopAccountSnapshot, type CoopRole } from "#coop/coop-protocol";
 import { getCoopRewardCounters } from "#coop/coop-reward";
 import { type CoopSession, coopSession } from "#coop/coop-session";
@@ -87,4 +90,43 @@ export function saveCoopGuestData(gameData: GameData, sync: boolean): Promise<bo
   }
   // `saveSystem` stores locally and, online, on the server; without `sync` solo only stores locally.
   return sync || bypassLogin ? gameData.saveSystem() : Promise.resolve(true);
+}
+
+/** Whether a save server answer to reading the co-op slot is the range error of a server without that slot. */
+export function isCoopSlotRangeError(response: string | null): boolean {
+  return response?.includes(`slot id ${COOP_SESSION_SLOT} out of range`) ?? false;
+}
+
+let saveServerAnswer: boolean | null = null;
+
+/**
+ * Whether the save server can store co-op runs (spec 4.6 compatibility).
+ * A modified frontend on an unmodified server hides co-op: such a server answers reading the co-op slot with a range
+ * error. Offline, saves stay in the browser and any slot works. Replaced in tests.
+ */
+export const coopSaveServer = {
+  async supportsCoop(): Promise<boolean> {
+    if (bypassLogin) {
+      return true;
+    }
+    if (saveServerAnswer !== null) {
+      return saveServerAnswer;
+    }
+    const response = await pokerogueApi.savedata.session.get({ slot: COOP_SESSION_SLOT, clientSessionId });
+    if (response === null) {
+      // No answer at all: ask again next time.
+      return false;
+    }
+    saveServerAnswer = !isCoopSlotRangeError(response);
+    return saveServerAnswer;
+  },
+  /** Forget the answer, to ask again. */
+  reset(): void {
+    saveServerAnswer = null;
+  },
+};
+
+/** Whether a session slot is the co-op one (spec 4.6). */
+export function isCoopSessionSlot(slotId: number): boolean {
+  return slotId === COOP_SESSION_SLOT;
 }

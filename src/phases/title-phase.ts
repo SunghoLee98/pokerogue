@@ -11,6 +11,7 @@ import { bypassLogin } from "#constants/app-constants";
 import { isCoopAvailable } from "#coop/coop-connect";
 import { createCoopGameMode } from "#coop/coop-game-start";
 import { coopLobby, leaveCoop } from "#coop/coop-lobby";
+import { coopSaveServer, isCoopSessionSlot } from "#coop/coop-save";
 import { createCoopTitleOption } from "#coop/coop-title-menu";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-run";
 import { modifierTypes } from "#data/data-lists";
@@ -62,7 +63,8 @@ export class TitlePhase extends Phase {
    * Returns `NO_SAVE_SLOT` if not logged in or no session was found.
    */
   private async checkLastSaveSlot(): Promise<number> {
-    if (loggedInUser == null) {
+    // The co-op slot is only continued from the co-op menu.
+    if (loggedInUser == null || isCoopSessionSlot(loggedInUser.lastSessionSlot)) {
       return NO_SAVE_SLOT;
     }
     try {
@@ -193,7 +195,7 @@ export class TitlePhase extends Phase {
         keepOpen: true,
       },
     );
-    if (isCoopAvailable()) {
+    if (isCoopAvailable() && (await coopSaveServer.supportsCoop())) {
       const coopOption = createCoopTitleOption({
         onConnected: () => {
           this.gameMode = GameModes.CLASSIC;

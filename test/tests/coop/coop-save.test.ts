@@ -1,7 +1,9 @@
+import { pokerogueApi } from "#api/api";
 import { getSessionDataLocalStorageKey, loggedInUser } from "#app/account";
+import * as appConstants from "#constants/app-constants";
 import { COOP_SESSION_SLOT } from "#coop/coop-game-start";
 import { COOP_PROTOCOL_VERSION, type CoopAccountSnapshot, type CoopRole } from "#coop/coop-protocol";
-import { normalizeCoopSaveData } from "#coop/coop-save";
+import { coopSaveServer, isCoopSlotRangeError, normalizeCoopSaveData } from "#coop/coop-save";
 import { coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import { MoveId } from "#enums/move-id";
@@ -185,5 +187,52 @@ describe("normalizeCoopSaveData", () => {
       accounts: { host: snapshot(1), guest: snapshot(2) },
     });
     expect(normalized).toMatchObject({ timedEvent: null, decisionSeq: 0, rewardGen: 0, rewardSeq: 0 });
+  });
+});
+
+describe("save server check", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    coopSaveServer.reset();
+  });
+
+  it("recognizes the error of a server without the co-op slot", () => {
+    expect(isCoopSlotRangeError("slot id 5 out of range\n")).toBe(true);
+    expect(isCoopSlotRangeError("save does not exist\n")).toBe(false);
+    expect(isCoopSlotRangeError('{"seed":"abc"}')).toBe(false);
+    expect(isCoopSlotRangeError(null)).toBe(false);
+  });
+
+  it("asks an online server for the co-op slot once", async () => {
+    vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+    const get = vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue("slot id 5 out of range\n");
+
+    await expect(coopSaveServer.supportsCoop()).resolves.toBe(false);
+    await expect(coopSaveServer.supportsCoop()).resolves.toBe(false);
+
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get.mock.calls[0][0]).toMatchObject({ slot: COOP_SESSION_SLOT });
+  });
+
+  it("accepts a server that knows the co-op slot", async () => {
+    vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+    vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValue("save does not exist\n");
+    await expect(coopSaveServer.supportsCoop()).resolves.toBe(true);
+  });
+
+  it("asks again after a network failure", async () => {
+    vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(false);
+    const get = vi.spyOn(pokerogueApi.savedata.session, "get").mockResolvedValueOnce(null);
+    get.mockResolvedValueOnce("save does not exist\n");
+
+    await expect(coopSaveServer.supportsCoop()).resolves.toBe(false);
+    await expect(coopSaveServer.supportsCoop()).resolves.toBe(true);
+  });
+
+  it("needs no server offline", async () => {
+    vi.spyOn(appConstants, "bypassLogin", "get").mockReturnValue(true);
+    const get = vi.spyOn(pokerogueApi.savedata.session, "get");
+    await expect(coopSaveServer.supportsCoop()).resolves.toBe(true);
+    expect(get).not.toHaveBeenCalled();
   });
 });
