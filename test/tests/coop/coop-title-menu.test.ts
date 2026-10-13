@@ -7,6 +7,7 @@ import { coopText } from "#coop/coop-text";
 import { coopTransportFactory, describeCoopError } from "#coop/coop-title-menu";
 import { createLoopbackPair } from "#coop/loopback-transport";
 import { CoopRelayError } from "#coop/relay-websocket-transport";
+import { ReliableCoopTransport } from "#coop/reliable-coop-transport";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import { waitForCoop } from "#test/utils/coop-partner";
@@ -121,7 +122,7 @@ describe("co-op title menu", () => {
     await game.phaseInterceptor.to("SelectStarterPhase", false);
 
     expect(coopLobby?.role).toBe("host");
-    expect(coopLobby?.transport).toBe(pair.host);
+    expect(coopLobby?.transport).toBeInstanceOf(ReliableCoopTransport);
     expect(game.scene.gameMode.isCoop).toBe(true);
   });
 

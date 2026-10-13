@@ -6,6 +6,7 @@ import { CoopSession, coopSession, setCoopSession } from "#coop/coop-session";
 import { CoopStarterSelection } from "#coop/coop-starter-selection";
 import type { CoopConnectionStatus, CoopTransport } from "#coop/coop-transport";
 import { createLoopbackPair } from "#coop/loopback-transport";
+import { ReliableCoopTransport } from "#coop/reliable-coop-transport";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
@@ -52,8 +53,16 @@ describe("co-op connection", () => {
     expect(urls).toEqual(["wss://relay.test"]);
     expect(host).toMatchObject({ role: "host", peerAccountName: "Guesty", peerTrainerId: 8, peerResume: false });
     expect(guest).toMatchObject({ role: "guest", peerAccountName: "Hosty", peerTrainerId: 7, peerResume: false });
-    expect(host.transport).toBe(pair.host);
-    expect(guest.transport).toBe(pair.guest);
+    // Both ends resend what a dropped connection loses.
+    expect(host.transport).toBeInstanceOf(ReliableCoopTransport);
+    expect(guest.transport).toBeInstanceOf(ReliableCoopTransport);
+    const received: string[] = [];
+    guest.transport.onMessage(m => received.push(m.t));
+    pair.drop();
+    host.transport.send({ t: "bye" });
+    pair.restore();
+    await flush();
+    expect(received).toEqual(["bye"]);
   });
 
   it("rejects a malformed join code without connecting", async () => {

@@ -13,9 +13,11 @@ import {
 
 const LOOPBACK_JOIN_CODE = "LOOP00";
 
-class LoopbackTransport implements CoopTransport {
+export class LoopbackTransport implements CoopTransport {
   private readonly listeners = new CoopTransportListeners();
   private peer: LoopbackTransport;
+  /** While dropped, messages are lost as over a broken connection. */
+  private dropped = false;
 
   link(peer: LoopbackTransport): void {
     this.peer = peer;
@@ -36,12 +38,12 @@ class LoopbackTransport implements CoopTransport {
   }
 
   send(message: CoopMessage): void {
-    if (this.isClosed) {
+    if (this.isClosed || this.dropped) {
       return;
     }
     // Deliver asynchronously, like a real network would.
     queueMicrotask(() => {
-      if (!this.peer.isClosed) {
+      if (!this.peer.isClosed && !this.peer.dropped) {
         this.peer.listeners.emitMessage(message);
       }
     });
@@ -64,16 +66,45 @@ class LoopbackTransport implements CoopTransport {
     queueMicrotask(() => this.peer.listeners.setStatus("closed"));
   }
 
+  /** Test control: lose the connection (both ends report `"reconnecting"`). */
+  setDropped(dropped: boolean): void {
+    if (this.isClosed) {
+      return;
+    }
+    this.dropped = dropped;
+    this.listeners.setStatus(dropped ? "reconnecting" : "connected");
+  }
+
   private get isClosed(): boolean {
     return this.listeners.status === "closed";
   }
 }
 
+export interface LoopbackPair {
+  host: LoopbackTransport;
+  guest: LoopbackTransport;
+  /** Break the connection: both ends report `"reconnecting"` and messages are lost until {@linkcode restore}. */
+  drop(): void;
+  /** Reconnect both ends. */
+  restore(): void;
+}
+
 /** Create two linked transports. The guest joins with the code the host receives. */
-export function createLoopbackPair(): { host: CoopTransport; guest: CoopTransport } {
+export function createLoopbackPair(): LoopbackPair {
   const host = new LoopbackTransport();
   const guest = new LoopbackTransport();
   host.link(guest);
   guest.link(host);
-  return { host, guest };
+  return {
+    host,
+    guest,
+    drop: () => {
+      host.setDropped(true);
+      guest.setDropped(true);
+    },
+    restore: () => {
+      host.setDropped(false);
+      guest.setDropped(false);
+    },
+  };
 }

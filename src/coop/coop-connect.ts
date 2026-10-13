@@ -10,9 +10,10 @@ import { type CoopHandshakeResult, type CoopHelloInfo, performHandshake } from "
 import type { CoopRole } from "#coop/coop-protocol";
 import type { CoopTransport, Unsubscribe } from "#coop/coop-transport";
 import { getDefaultRelayUrl, parseJoinInput, RelayWebSocketTransport } from "#coop/relay-websocket-transport";
+import { ReliableCoopTransport } from "#coop/reliable-coop-transport";
 import { version } from "#package.json";
 
-/** A connected, version-checked link to the partner. */
+/** A connected, version-checked link to the partner. Its transport resends what a dropped connection loses. */
 export interface CoopConnection extends CoopHandshakeResult {
   role: CoopRole;
   transport: CoopTransport;
@@ -80,7 +81,7 @@ export async function hostCoop(
     peer.cancel();
   }
   const partner = await performHandshake(transport, local);
-  return { role: "host", transport, ...partner };
+  return { role: "host", transport: new ReliableCoopTransport(transport), ...partner };
 }
 
 export interface CoopJoinOptions {
@@ -113,5 +114,5 @@ export async function joinCoop(input: string, options: CoopJoinOptions = {}): Pr
     throw error;
   }
   const partner = await performHandshake(transport, local);
-  return { role: "guest", transport, ...partner };
+  return { role: "guest", transport: new ReliableCoopTransport(transport), ...partner };
 }
