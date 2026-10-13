@@ -58,6 +58,7 @@ import {
 import type { BattleMessageUiHandler } from "#ui/battle-message-ui-handler";
 import type { ConfirmUiHandler } from "#ui/confirm-ui-handler";
 import type { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
+import type { PartyUiHandler } from "#ui/party-ui-handler";
 import { getEnumValues } from "#utils/enums";
 import { vi } from "vitest";
 
@@ -132,6 +133,13 @@ export interface CoopReplayOptions {
   onStart?: (game: GameManager) => void;
   /** The shared seed; both runs must use the same one. Default `"coop-replay"` */
   seed?: string;
+  /**
+   * Each player's battle style, a local setting: a player is only asked "switch?" at the start of a wave with
+   * "Switch". Default: "Set" for both
+   */
+  styles?: Partial<Record<CoopRole, BattleStyle>>;
+  /** The party slot a player asked "switch?" at the start of a wave sends out, `null` to stay. Default: stay */
+  waveStartSwitch?: (role: CoopRole, wave: number) => number | null;
 }
 
 /**
@@ -153,6 +161,11 @@ export interface CoopBattleStartOptions {
   transport?: CoopTransport;
   /** Both players' account names */
   participants?: Record<CoopRole, string>;
+  /**
+   * With the "Switch" battle style: the party slot to send out when asked at the start of the first wave, `null` to
+   * stay (the default), or a function giving either once asked
+   */
+  waveStartSwitch?: WaveStartSwitchAnswer;
 }
 
 /**
@@ -167,21 +180,42 @@ export async function startCoopBattle(game: GameManager, options: CoopBattleStar
   }
 
   if (settings.general.battleStyle === BattleStyle.SWITCH) {
-    for (let i = 0; i < 2; i++) {
-      game.onNextPrompt(
-        "CheckSwitchPhase",
-        UiMode.CONFIRM,
-        () => {
-          game.setMode(UiMode.MESSAGE);
-          game.endPhase();
-        },
-        () => game.isCurrentPhase("CommandPhase") || game.isCurrentPhase("TurnInitPhase"),
-      );
-    }
+    answerWaveStartSwitchPrompt(game, options.waveStartSwitch ?? null);
   }
 
   await game.phaseInterceptor.to("CommandPhase");
 }
+
+/**
+ * Answer the local player's wave start "switch?" question (only asked with the "Switch" battle style, and only about
+ * the player's own pokemon), if it comes before the next command.
+ * @param slot - The party slot to send out, or `null` to keep the pokemon in
+ */
+export function answerWaveStartSwitchPrompt(game: GameManager, answer: WaveStartSwitchAnswer): void {
+  const expired = () => game.isCurrentPhase("CommandPhase") || game.isCurrentPhase("TurnInitPhase");
+  game.onNextPrompt(
+    "CheckSwitchPhase",
+    UiMode.CONFIRM,
+    () => {
+      const slot = typeof answer === "function" ? answer() : answer;
+      if (slot !== null) {
+        game.onNextPrompt("CheckSwitchPhase", UiMode.PARTY, () => {
+          const handler = game.scene.ui.getHandler() as PartyUiHandler;
+          handler.setCursor(slot);
+          handler.processInput(Button.ACTION); // select the pokemon
+          handler.processInput(Button.ACTION); // send it out
+        });
+      }
+      const handler = game.scene.ui.getHandler() as ConfirmUiHandler;
+      handler.setCursor(slot === null ? 1 : 0);
+      handler.processInput(Button.ACTION);
+    },
+    expired,
+  );
+}
+
+/** A party slot to send out at the start of a wave, `null` to stay, or a function giving either once asked. */
+export type WaveStartSwitchAnswer = number | null | (() => number | null);
 
 /**
  * Start a co-op run whose first wave is the given mystery encounter and wait until its options are shown,
@@ -231,7 +265,8 @@ async function toCoopEncounterPhase(
     game.override.nature(Nature.HARDY).enemyNature(Nature.HARDY);
   }
 
-  const transport = options.transport ?? createLoopbackPair()[options.role];
+  // A scripted partner by default, so that the partner's wave start answers arrive.
+  const transport = options.transport ?? new CoopTestPartner(options.role).localTransport;
   game.onNextPrompt("TitlePhase", UiMode.TITLE, async () => {
     game.scene.gameMode = createCoopGameMode();
     const selectStarterPhase = new SelectStarterPhase();
@@ -498,6 +533,8 @@ function inputTurn(game: GameManager, options: CoopReplayOptions, log: CoopRepla
 
 /** Where reward screen messages are filed: they belong to the wave, not to a turn. */
 const REWARD_TURN = 0;
+/** Where the answers to the "switch?" question at the start of a wave are filed: they come before the first turn. */
+const WAVE_START_TURN = -1;
 
 /** Wait until the reward screen with this number is open, running the phases up to it. */
 async function toRewardScreen(game: GameManager, gen: number): Promise<SelectModifierPhase> {
@@ -603,6 +640,9 @@ function fileAt(game: GameManager, message: CoopMessage): { wave: number; turn: 
       return { wave: message.wave, turn: message.turn };
     case "confirm":
     case "choice": {
+      if (message.kind === "waveStartSwitch") {
+        return { wave: message.wave, turn: WAVE_START_TURN };
+      }
       const { waveIndex, turn } = game.scene.currentBattle;
       return "turn" in message && message.turn !== undefined
         ? { wave: message.wave, turn: message.turn }
@@ -611,6 +651,43 @@ function fileAt(game: GameManager, message: CoopMessage): { wave: number; turn: 
     default:
       return null;
   }
+}
+
+/**
+ * Answer the local client's waits for the partner's wave start "switch?" answer: made up from the scripts when
+ * recording (a partner playing "Set" is not asked and stays), or the recorded answer with the same number when
+ * replaying.
+ */
+function answerRemoteWaveStartSwitches(options: CoopReplayOptions, log: CoopReplayLog, partner: CoopTestPartner): void {
+  const { remote } = options;
+  const by: CoopRole = options.role === "host" ? "guest" : "host";
+  partner.answerWaveStartSwitch = (seq: number) => {
+    const wave = globalScene.currentBattle.waveIndex;
+    let message: CoopMessage | undefined;
+    if ("log" in remote) {
+      message = remote.log.inputs.find(
+        i =>
+          i.by === by
+          && i.message.t === "choice"
+          && i.message.kind === "waveStartSwitch"
+          && (i.message.payload as { seq: number }).seq === seq,
+      )?.message;
+      if (!message) {
+        throw new Error(`no recorded wave start switch answer ${seq} of the ${by}`);
+      }
+    } else {
+      const asked = options.styles?.[by] === BattleStyle.SWITCH;
+      const slot = asked ? (options.waveStartSwitch?.(by, wave) ?? null) : null;
+      message = {
+        t: "choice",
+        kind: "waveStartSwitch",
+        wave,
+        payload: { kind: "waveStartSwitch", seq, slotIndex: slot ?? -1 },
+      };
+    }
+    log.inputs.push({ by, wave, turn: WAVE_START_TURN, message });
+    partner.send(message);
+  };
 }
 
 /** The partner's request count in a recording run. */
@@ -643,6 +720,17 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
   };
   const log: CoopReplayLog = { inputs: [], checksums: [], enemyIds: [], states: [] };
   const partner = new CoopTestPartner(options.role);
+  answerRemoteWaveStartSwitches(options, log, partner);
+  const localStyle = options.styles?.[options.role] ?? BattleStyle.SET;
+  game.settings.battleStyle(localStyle);
+  const localWaveStartSwitch = () =>
+    options.waveStartSwitch?.(options.role, game.scene.currentBattle.waveIndex) ?? null;
+  /** Answer the local player's question at the start of the next wave, if asked. */
+  const answerLocalWaveStartSwitch = () => {
+    if (localStyle === BattleStyle.SWITCH) {
+      answerWaveStartSwitchPrompt(game, localWaveStartSwitch);
+    }
+  };
   remoteRequests.count = 0;
   let read = 0;
   /** File what the local client sent since the last call. */
@@ -669,7 +757,12 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
   try {
     // The real co-op start: both clients sow the shared seed before creating the starters, so starter ids agree,
     // and the starters' owners are registered from the picks.
-    await startCoopBattle(game, { role: options.role, start, transport: partner.localTransport });
+    await startCoopBattle(game, {
+      role: options.role,
+      start,
+      transport: partner.localTransport,
+      waveStartSwitch: localWaveStartSwitch,
+    });
     options.onStart?.(game);
     waveStart();
 
@@ -688,6 +781,7 @@ export async function runCoopReplay(game: GameManager, options: CoopReplayOption
       if (!fled && !game.isVictory()) {
         await game.toNextTurn();
       } else if (++finished < options.waves) {
+        answerLocalWaveStartSwitch();
         if (fled) {
           // No rewards after fleeing.
           await game.phaseInterceptor.to("TurnInitPhase");

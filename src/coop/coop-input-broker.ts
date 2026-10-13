@@ -32,6 +32,7 @@ const DECISION_KINDS: ReadonlySet<string> = new Set<CoopDecisionKind>([
   "partyPick",
   "learnMove",
   "evolution",
+  "waveStartSwitch",
 ]);
 
 /** Delivers messages to one listener, keeping those that arrive while nobody listens. */

@@ -44,6 +44,8 @@ const startInfo = (): CoopStartInfo => ({
 describe("co-op captures", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
+  /** The number of the first decision made after the battle started */
+  let firstSeq = 0;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -68,6 +70,8 @@ describe("co-op captures", () => {
   async function start(role: CoopRole, info = startInfo()): Promise<CoopTestPartner> {
     const partner = new CoopTestPartner(role);
     await startCoopBattle(game, { role, start: info, transport: partner.localTransport });
+    // The wave start "switch?" answers came first.
+    firstSeq = coopSession!.decisionCount;
     game.scene.pokeballCounts[PokeballType.MASTER_BALL] = 5;
     return partner;
   }
@@ -104,7 +108,13 @@ describe("co-op captures", () => {
     const caught = game.scene.getEnemyField()[0];
     game.move.select(MoveId.SPLASH, BattlerIndex.PLAYER);
     partner.sendCommand(synthesizeBallCommand(1, PokeballType.MASTER_BALL, BattlerIndex.ENEMY));
-    partner.sendDecision({ kind: "capture", seq: 0, action: "replace", releasedId: released.id, insertIndex: 3 });
+    partner.sendDecision({
+      kind: "capture",
+      seq: firstSeq,
+      action: "replace",
+      releasedId: released.id,
+      insertIndex: 3,
+    });
     await game.toEndOfTurn();
 
     const party = game.scene.getPlayerParty();
@@ -121,7 +131,13 @@ describe("co-op captures", () => {
     const showText = vi.spyOn(game.scene.ui, "showText");
     game.move.select(MoveId.SPLASH, BattlerIndex.PLAYER);
     partner.sendCommand(synthesizeBallCommand(1, PokeballType.MASTER_BALL, BattlerIndex.ENEMY));
-    partner.sendDecision({ kind: "capture", seq: 0, action: "replace", releasedId: released.id, insertIndex: 3 });
+    partner.sendDecision({
+      kind: "capture",
+      seq: firstSeq,
+      action: "replace",
+      releasedId: released.id,
+      insertIndex: 3,
+    });
     await game.toEndOfTurn();
 
     const texts = showText.mock.calls.map(call => call[0]);
@@ -135,7 +151,7 @@ describe("co-op captures", () => {
     const before = partyIds();
     game.move.select(MoveId.SPLASH, BattlerIndex.PLAYER);
     partner.sendCommand(synthesizeBallCommand(1, PokeballType.MASTER_BALL, BattlerIndex.ENEMY));
-    partner.sendDecision({ kind: "capture", seq: 0, action: "keepOut" });
+    partner.sendDecision({ kind: "capture", seq: firstSeq, action: "keepOut" });
     await game.toEndOfTurn();
 
     expect(partyIds()).toEqual(before);
@@ -156,11 +172,11 @@ describe("co-op captures", () => {
       handler.processInput(Button.ACTION);
     });
     await game.toEndOfTurn();
-    await vi.waitUntil(() => partner.received.some(m => m.t === "choice"));
+    await vi.waitUntil(() => partner.received.some(m => m.t === "choice" && m.kind === "capture"));
 
     expect(partyIds()).toEqual(before);
-    const choice = partner.received.find(m => m.t === "choice");
-    expect(choice?.t === "choice" && choice.payload).toEqual({ kind: "capture", seq: 0, action: "keepOut" });
+    const choice = partner.received.find(m => m.t === "choice" && m.kind === "capture");
+    expect(choice?.t === "choice" && choice.payload).toEqual({ kind: "capture", seq: firstSeq, action: "keepOut" });
   });
 
   it("reports the released pokemon when the thrower makes room", async () => {
@@ -172,12 +188,12 @@ describe("co-op captures", () => {
     // What the party screen's release does before the capture adds the new pokemon.
     game.scene.getPlayerParty().splice(2, 1);
     decision?.replaced(2);
-    await vi.waitUntil(() => partner.received.some(m => m.t === "choice"));
+    await vi.waitUntil(() => partner.received.some(m => m.t === "choice" && m.kind === "capture"));
 
-    const choice = partner.received.find(m => m.t === "choice");
+    const choice = partner.received.find(m => m.t === "choice" && m.kind === "capture");
     expect(choice?.t === "choice" && choice.payload).toEqual({
       kind: "capture",
-      seq: 0,
+      seq: firstSeq,
       action: "replace",
       releasedId: guestPokemon.id,
       insertIndex: 2,

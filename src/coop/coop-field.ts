@@ -11,6 +11,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import type { CoopDecision, CoopRole } from "#coop/coop-protocol";
 import { type CoopSession, coopSession } from "#coop/coop-session";
 import { coopText } from "#coop/coop-text";
+import { BattleType } from "#enums/battle-type";
 import { FieldPosition } from "#enums/field-position";
 import { PartyUiMode } from "#enums/party-ui-mode";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
@@ -47,7 +48,7 @@ export function wrapCoopPartyFilter<F extends (pokemon: PlayerPokemon, ...rest: 
 }
 
 /** The owner of a party pokemon; pokemon without a recorded owner count as the host's. */
-function ownerOf(session: CoopSession, pokemon: PlayerPokemon): CoopRole {
+export function ownerOf(session: CoopSession, pokemon: PlayerPokemon): CoopRole {
   return session.ownership.get(pokemon.id) ?? "host";
 }
 
@@ -85,12 +86,35 @@ export function arrangeCoopParty(session: CoopSession): (PlayerPokemon | undefin
 }
 
 /**
+ * Whether solo asks "switch?" at the start of this wave (`EncounterPhase.end`, `TitlePhase` after loading a run):
+ * not against a trainer, and not on the first wave of a daily run.
+ */
+export function soloAsksSwitch(): boolean {
+  const { currentBattle, gameMode } = globalScene;
+  return currentBattle.battleType !== BattleType.TRAINER && (currentBattle.waveIndex > 1 || !gameMode.isDaily);
+}
+
+/**
+ * Queue the "switch?" question for each player's pokemon sent out at the start of a wave (see
+ * `takeOverCoopSwitchQuestion`). An empty slot gets no question.
+ * @param fighters - The pokemon in each slot, from {@linkcode arrangeCoopParty}
+ */
+export function queueCoopSwitchQuestions(fighters: readonly (PlayerPokemon | undefined)[]): void {
+  for (const [fieldIndex, fighter] of fighters.entries()) {
+    if (fighter) {
+      globalScene.phaseManager.pushNew("CheckSwitchPhase", fieldIndex, true);
+    }
+  }
+}
+
+/**
  * Queue the summons at the start of a co-op wave, in place of the solo "send out the first two living pokemon".
  * Each player's slot gets their own pokemon (see {@linkcode arrangeCoopParty}); a wiped player's slot stays empty.
- * There is no "switch?" question: it depends on each client's battle style setting, so the clients could disagree.
+ * Then each player is asked "switch?" about their own pokemon where solo would ask.
+ * @param askSwitch - Whether solo would ask "switch?" here
  * @returns Whether co-op queued the summons (the caller must skip its own)
  */
-export function queueCoopFieldSummons(): boolean {
+export function queueCoopFieldSummons(askSwitch = soloAsksSwitch()): boolean {
   const session = coopSession;
   if (!session) {
     return false;
@@ -114,6 +138,9 @@ export function queueCoopFieldSummons(): boolean {
   }
   if (second && !second.isOnField()) {
     phaseManager.pushNew("SummonPhase", 1);
+  }
+  if (askSwitch) {
+    queueCoopSwitchQuestions(fighters);
   }
   return true;
 }

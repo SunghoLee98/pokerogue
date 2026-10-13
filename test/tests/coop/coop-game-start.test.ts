@@ -13,6 +13,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { Unlockables } from "#enums/unlockables";
 import { GameManager } from "#test/framework/game-manager";
+import { answerWaveStartSwitches } from "#test/utils/coop-partner";
 import {
   applyTestAccount,
   type CoopTestAccount,
@@ -214,9 +215,16 @@ describe("co-op start end to end", () => {
     return [{ ...createTestStarterPayload(SpeciesId.BULBASAUR), moveset }, createTestStarterPayload(SpeciesId.PIKACHU)];
   }
 
-  async function runRole(role: CoopRole, start: CoopStartInfo, transport: CoopTransport): Promise<RoleRun> {
+  async function runRole(
+    role: CoopRole,
+    start: CoopStartInfo,
+    transport: CoopTransport,
+    partnerTransport: CoopTransport,
+  ): Promise<RoleRun> {
     setUpOverrides();
     applyTestAccount(game.scene.gameData, accounts[role]);
+    // The partner's game is not running: answer its wave start "switch?" question for it.
+    answerWaveStartSwitches(partnerTransport);
     await startCoopBattle(game, { role, start, transport });
     const party = game.scene.getPlayerParty();
     const run: RoleRun = {
@@ -239,9 +247,9 @@ describe("co-op start end to end", () => {
         account: snapshotForTestAccount(gameData, accounts.guest),
       },
     });
-    const host = await runRole("host", starts.host, transports.host);
+    const host = await runRole("host", starts.host, transports.host, transports.guest);
     game = createFreshGameManager(phaserGame);
-    const guest = await runRole("guest", starts.guest, transports.guest);
+    const guest = await runRole("guest", starts.guest, transports.guest, transports.host);
     return { host, guest };
   }
 

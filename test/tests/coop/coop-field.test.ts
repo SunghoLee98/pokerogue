@@ -2,7 +2,6 @@ import type { CoopAccountSnapshot, CoopRole } from "#coop/coop-protocol";
 import { coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import { coopText } from "#coop/coop-text";
-import { BattleStyle } from "#enums/battle-style";
 import { BattlerIndex } from "#enums/battler-index";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -34,6 +33,8 @@ function startInfo(host: SpeciesId[], guest: SpeciesId[]): CoopStartInfo {
 describe("co-op field slots", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
+  /** The number of the first decision made after the battle started */
+  let firstSeq = 0;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -59,6 +60,8 @@ describe("co-op field slots", () => {
   async function start(role: CoopRole, host: SpeciesId[], guest: SpeciesId[]): Promise<CoopTestPartner> {
     const partner = new CoopTestPartner(role);
     await startCoopBattle(game, { role, start: startInfo(host, guest), transport: partner.localTransport });
+    // The wave start "switch?" answers came first.
+    firstSeq = coopSession!.decisionCount;
     game.phaseInterceptor.clearLogs();
     return partner;
   }
@@ -96,7 +99,7 @@ describe("co-op field slots", () => {
     const partner = await start("host", [SpeciesId.BULBASAUR], [SpeciesId.CHARMANDER, SpeciesId.RATTATA]);
     const rattata = game.scene.getPlayerParty()[2];
     await guestFaintsAsHost(partner);
-    partner.sendDecision({ kind: "switch", seq: 0, slotIndex: 2, option: PartyOption.SEND_OUT });
+    partner.sendDecision({ kind: "switch", seq: firstSeq, slotIndex: 2, option: PartyOption.SEND_OUT });
     await game.toNextTurn();
 
     expect(game.scene.getPlayerField()[1]).toBe(rattata);
@@ -107,7 +110,7 @@ describe("co-op field slots", () => {
     const partner = await start("host", [SpeciesId.BULBASAUR], [SpeciesId.CHARMANDER, SpeciesId.RATTATA]);
     const showText = vi.spyOn(game.scene.ui, "showText");
     await guestFaintsAsHost(partner);
-    partner.sendDecision({ kind: "switch", seq: 0, slotIndex: 2, option: PartyOption.SEND_OUT });
+    partner.sendDecision({ kind: "switch", seq: firstSeq, slotIndex: 2, option: PartyOption.SEND_OUT });
     await game.toNextTurn();
 
     const texts = showText.mock.calls.map(call => call[0]);
@@ -125,11 +128,11 @@ describe("co-op field slots", () => {
     await game.toNextTurn();
 
     expect(game.scene.getPlayerField()[1]).toBe(rattata);
-    await vi.waitUntil(() => partner.received.some(m => m.t === "choice"));
-    const choice = partner.received.find(m => m.t === "choice");
+    await vi.waitUntil(() => partner.received.some(m => m.t === "choice" && m.kind === "switch"));
+    const choice = partner.received.find(m => m.t === "choice" && m.kind === "switch");
     expect(choice?.t === "choice" && choice.payload).toEqual({
       kind: "switch",
-      seq: 0,
+      seq: firstSeq,
       slotIndex: 2,
       option: PartyOption.SEND_OUT,
     });
@@ -146,7 +149,8 @@ describe("co-op field slots", () => {
     expect(game.scene.getPlayerParty().slice(0, 2)).toEqual([bulbasaur, charmander]);
     expect(activeField()).toEqual([bulbasaur]);
     expect(pidgey.isOnField()).toBe(false);
-    expect(game.phaseInterceptor.phaseLog).not.toContain("CheckSwitchPhase");
+    // Only the host, who has a pokemon on the field, is asked whether to switch.
+    expect(game.phaseInterceptor.phaseLog.filter(p => p === "CheckSwitchPhase")).toHaveLength(1);
   });
 
   it("brings a revived player back in the next wave", async () => {
@@ -179,18 +183,5 @@ describe("co-op field slots", () => {
     expect(game.scene.getPlayerField()).toEqual([pidgey, charmander]);
     expect(activeField()).toEqual([pidgey, charmander]);
     expect(pidgey.isOnField()).toBe(true);
-  });
-
-  it("does not ask whether to switch at the start of a wave", async () => {
-    game.settings.battleStyle(BattleStyle.SWITCH);
-    const partner = await start("host", [SpeciesId.BULBASAUR, SpeciesId.PIDGEY], [SpeciesId.CHARMANDER]);
-    game.move.select(MoveId.HYPER_VOICE, BattlerIndex.PLAYER);
-    partner.sendCommand(synthesizeMoveCommand(1, MoveId.SPLASH));
-    await game.toEndOfTurn();
-    expect(game.isVictory()).toBe(true);
-    await game.toNextWave();
-
-    expect(game.phaseInterceptor.phaseLog).toContain("NextEncounterPhase");
-    expect(game.phaseInterceptor.phaseLog).not.toContain("CheckSwitchPhase");
   });
 });

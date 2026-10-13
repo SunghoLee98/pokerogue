@@ -1,6 +1,6 @@
 import { getCoopBannerText } from "#coop/coop-banner";
 import type { CoopAccountSnapshot, CoopDecision, CoopMessage, CoopRole } from "#coop/coop-protocol";
-import { setCoopSession } from "#coop/coop-session";
+import { coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import { coopText } from "#coop/coop-text";
 import { BattlerIndex } from "#enums/battler-index";
@@ -42,6 +42,8 @@ const FOUR_MOVES = [MoveId.SPLASH, MoveId.TACKLE, MoveId.GROWL, MoveId.SCRATCH];
 describe("co-op choices for one's own pokemon", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
+  /** The number of the first decision made after the battle started */
+  let firstSeq = 0;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -65,6 +67,8 @@ describe("co-op choices for one's own pokemon", () => {
   async function start(role: CoopRole): Promise<CoopTestPartner> {
     const partner = new CoopTestPartner(role);
     await startCoopBattle(game, { role, start: startInfo(), transport: partner.localTransport });
+    // The wave start "switch?" answers came first.
+    firstSeq = coopSession!.decisionCount;
     for (const pokemon of game.scene.getPlayerParty()) {
       game.move.changeMoveset(pokemon, FOUR_MOVES);
     }
@@ -102,7 +106,7 @@ describe("co-op choices for one's own pokemon", () => {
           .getMoveset()
           .map(m => m.moveId),
       ).toEqual([MoveId.SPLASH, MoveId.TACKLE, MoveId.EMBER, MoveId.SCRATCH]);
-      expect(decisions(partner)).toEqual([{ kind: "learnMove", seq: 0, moveIndex: 2 }]);
+      expect(decisions(partner)).toEqual([{ kind: "learnMove", seq: firstSeq, moveIndex: 2 }]);
     });
 
     it("applies the owner's pick on the partner's client", async () => {
@@ -114,7 +118,7 @@ describe("co-op choices for one's own pokemon", () => {
       await waitForCoop(() => game.textInterceptor.logs.includes(coopText("waitingForPartnerChoice")));
 
       expect(game.scene.ui.mode).not.toBe(UiMode.CONFIRM);
-      partner.sendDecision({ kind: "learnMove", seq: 0, moveIndex: 1 });
+      partner.sendDecision({ kind: "learnMove", seq: firstSeq, moveIndex: 1 });
       await learning;
       expect(
         charmander()
@@ -126,7 +130,7 @@ describe("co-op choices for one's own pokemon", () => {
     it("keeps the moves when the owner gives up learning", async () => {
       const partner = await start("host");
       game.scene.phaseManager.unshiftNew("LearnMovePhase", 1, MoveId.EMBER);
-      partner.sendDecision({ kind: "learnMove", seq: 0, moveIndex: -1 });
+      partner.sendDecision({ kind: "learnMove", seq: firstSeq, moveIndex: -1 });
       splashTurn("host", partner);
       await game.toEndOfTurn();
 
@@ -147,8 +151,8 @@ describe("co-op choices for one's own pokemon", () => {
     it("lets only the owner stop the evolution", async () => {
       const partner = await start("host");
       queueEvolution(charmander());
-      partner.sendDecision({ kind: "evolution", seq: 0, cancelled: true, paused: false });
-      partner.sendDecision({ kind: "evolution", seq: 1, cancelled: true, paused: true });
+      partner.sendDecision({ kind: "evolution", seq: firstSeq, cancelled: true, paused: false });
+      partner.sendDecision({ kind: "evolution", seq: firstSeq + 1, cancelled: true, paused: true });
       splashTurn("host", partner);
       await game.phaseInterceptor.to("EvolutionPhase", false);
       const evolving = game.phaseInterceptor.to("EndEvolutionPhase");
@@ -187,8 +191,8 @@ describe("co-op choices for one's own pokemon", () => {
 
       expect(charmander().species.speciesId).toBe(SpeciesId.CHARMANDER);
       expect(decisions(partner)).toEqual([
-        { kind: "evolution", seq: 0, cancelled: true, paused: false },
-        { kind: "evolution", seq: 1, cancelled: true, paused: true },
+        { kind: "evolution", seq: firstSeq, cancelled: true, paused: false },
+        { kind: "evolution", seq: firstSeq + 1, cancelled: true, paused: true },
       ]);
     });
 
@@ -199,7 +203,7 @@ describe("co-op choices for one's own pokemon", () => {
       await game.phaseInterceptor.to("EndEvolutionPhase");
 
       expect(charmander().species.speciesId).toBe(SpeciesId.CHARMELEON);
-      expect(decisions(partner)).toEqual([{ kind: "evolution", seq: 0, cancelled: false, paused: false }]);
+      expect(decisions(partner)).toEqual([{ kind: "evolution", seq: firstSeq, cancelled: false, paused: false }]);
     });
   });
 
@@ -220,7 +224,7 @@ describe("co-op choices for one's own pokemon", () => {
       await turn;
 
       expect(pidgey.isFainted()).toBe(false);
-      expect(decisions(partner)).toMatchObject([{ kind: "partyPick", seq: 0, slotIndex: 2 }]);
+      expect(decisions(partner)).toMatchObject([{ kind: "partyPick", seq: firstSeq, slotIndex: 2 }]);
     });
 
     it("is applied from the owner's pick on the partner's client", async () => {
@@ -235,7 +239,7 @@ describe("co-op choices for one's own pokemon", () => {
       await waitForCoop(() => getCoopBannerText() !== null || game.scene.ui.mode === UiMode.PARTY);
 
       expect(game.scene.ui.mode).not.toBe(UiMode.PARTY);
-      partner.sendDecision({ kind: "partyPick", seq: 0, slotIndex: 2, option: 0 });
+      partner.sendDecision({ kind: "partyPick", seq: firstSeq, slotIndex: 2, option: 0 });
       await reviving;
       await game.toEndOfTurn();
       expect(pidgey.isFainted()).toBe(false);

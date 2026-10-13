@@ -419,7 +419,7 @@ export class MysteryEncounterBattlePhase extends Phase {
       }
     }
 
-    if (queueCoopFieldSummons()) {
+    if (queueCoopFieldSummons(encounterMode !== MysteryEncounterMode.TRAINER_BATTLE && !this.disableSwitch)) {
       globalScene.phaseManager.pushNew("InitEncounterPhase");
       this.end();
       return;

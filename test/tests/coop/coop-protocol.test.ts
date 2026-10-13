@@ -116,8 +116,8 @@ describe("coop-protocol", () => {
     }
   });
 
-  it("is protocol 4", () => {
-    expect(COOP_PROTOCOL_VERSION).toBe(4);
+  it("is protocol 5", () => {
+    expect(COOP_PROTOCOL_VERSION).toBe(5);
   });
 
   it("returns null for malformed input", () => {

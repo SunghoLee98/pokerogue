@@ -12,7 +12,7 @@ import type { SpeciesId } from "#enums/species-id";
 import type { Variant } from "#sprites/variant";
 
 /** Bumped whenever a message shape changes incompatibly. Peers with different versions refuse to connect. */
-export const COOP_PROTOCOL_VERSION = 4;
+export const COOP_PROTOCOL_VERSION = 5;
 
 export type CoopRole = "host" | "guest";
 
@@ -97,7 +97,12 @@ export type CoopDecision =
   /** The move slot a new move replaces, `-1` if the move was not learned */
   | { kind: "learnMove"; seq: number; moveIndex: number }
   /** Whether the owner stopped an evolution, and whether they paused further evolutions */
-  | { kind: "evolution"; seq: number; cancelled: boolean; paused: boolean };
+  | { kind: "evolution"; seq: number; cancelled: boolean; paused: boolean }
+  /**
+   * The owner's answer to "switch?" at the start of a wave: the party slot sent out, a slot outside the party to stay.
+   * An owner who is not asked (the "Set" battle style) sends a stay too.
+   */
+  | { kind: "waveStartSwitch"; seq: number; slotIndex: number };
 
 export type CoopDecisionKind = CoopDecision["kind"];
 

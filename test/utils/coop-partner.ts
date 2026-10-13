@@ -7,6 +7,7 @@
  */
 
 import { globalScene } from "#app/global-scene";
+import { CoopInputBroker } from "#coop/coop-input-broker";
 import type { CoopDecision, CoopMessage, CoopRole, CoopTurnCommandPayload } from "#coop/coop-protocol";
 import type { CoopTransport } from "#coop/coop-transport";
 import { createLoopbackPair, type LoopbackPair } from "#coop/loopback-transport";
@@ -80,6 +81,47 @@ export function synthesizeRunCommand(fieldIndex: number): CoopTurnCommandPayload
   return asSent({ fieldIndex, turnCommand: { command: Command.RUN }, preTurnCommand: null });
 }
 
+/** Answers the local client's waits for the partner's wave start "switch?" choice: by default the last partner made. */
+let waveStartResponder: ((seq: number, fieldIndex: number) => void) | null = null;
+
+/**
+ * Answer the local client's waits for the partner's wave start switch choice as soon as it starts waiting, so tests
+ * need not know the decision number. The spy is restored after each test; each new partner installs it again.
+ */
+function watchWaveStartSwitchWaits(responder: (seq: number, fieldIndex: number) => void): void {
+  waveStartResponder = responder;
+  const proto = CoopInputBroker.prototype;
+  if (vi.isMockFunction(proto.waitDecision)) {
+    return;
+  }
+  const original = proto.waitDecision;
+  vi.spyOn(proto, "waitDecision").mockImplementation(function (this: CoopInputBroker, seq: number) {
+    const result = original.call(this, seq);
+    const phase = globalScene.phaseManager.getCurrentPhase();
+    if (phase?.is("CheckSwitchPhase")) {
+      waveStartResponder?.(seq, (phase as unknown as { fieldIndex: number }).fieldIndex);
+    }
+    return result;
+  });
+}
+
+/**
+ * Play the partner's part of the wave start "switch?" question over a connection the test drives itself: whenever the
+ * local client waits for the partner's answer, the partner stays.
+ * @param partnerTransport - The partner's end of the connection
+ */
+export function answerWaveStartSwitches(partnerTransport: CoopTransport): void {
+  watchWaveStartSwitchWaits(seq => {
+    const decision: CoopDecision = { kind: "waveStartSwitch", seq, slotIndex: -1 };
+    partnerTransport.send({
+      t: "choice",
+      kind: decision.kind,
+      wave: globalScene.currentBattle.waveIndex,
+      payload: decision,
+    });
+  });
+}
+
 export class CoopTestPartner {
   /** The local client's end of the connection, to start the co-op run with */
   readonly localTransport: CoopTransport;
@@ -89,6 +131,21 @@ export class CoopTestPartner {
   private readonly listeners = new Set<(message: CoopMessage) => void>();
 
   private readonly pair: LoopbackPair;
+
+  /**
+   * The party slot the partner sends out when asked at the start of a wave whether to switch its pokemon in
+   * `fieldIndex`, `null` to keep it. Default: keep it (as a partner playing with the "Set" battle style would).
+   */
+  waveStartSwitch: (wave: number, fieldIndex: number) => number | null = () => null;
+
+  /**
+   * Send the partner's answer to the wave start "switch?" question while the local client waits for it.
+   * Replaceable, for example to send a recorded answer instead.
+   */
+  answerWaveStartSwitch = (seq: number, fieldIndex: number): void => {
+    const slot = this.waveStartSwitch(globalScene.currentBattle.waveIndex, fieldIndex);
+    this.sendDecision({ kind: "waveStartSwitch", seq, slotIndex: slot ?? -1 });
+  };
 
   /**
    * @param localRole - The role of the client under test; the partner plays the other one
@@ -101,6 +158,7 @@ export class CoopTestPartner {
     const remote = pair[localRole === "host" ? "guest" : "host"];
     this.localTransport = reliable ? new ReliableCoopTransport(local) : local;
     this.transport = reliable ? new ReliableCoopTransport(remote) : remote;
+    watchWaveStartSwitchWaits((seq, fieldIndex) => this.answerWaveStartSwitch(seq, fieldIndex));
     this.transport.onMessage(message => {
       this.received.push(message);
       for (const listener of [...this.listeners]) {
