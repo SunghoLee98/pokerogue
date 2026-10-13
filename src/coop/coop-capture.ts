@@ -11,7 +11,7 @@ import type { CoopDecision, CoopRole } from "#coop/coop-protocol";
 import { type CoopSession, coopSession } from "#coop/coop-session";
 import { getPokemonSimData, getWorldSimData, type SimAccountData } from "#coop/coop-sim-data";
 import { coopText } from "#coop/coop-text";
-import type { PlayerPokemon } from "#field/pokemon";
+import type { Pokemon } from "#field/pokemon";
 
 /**
  * Account data for the critical capture chance: the thrower's account (spec 3.3, 4.1).
@@ -45,8 +45,12 @@ export function isCaptureRosterFull(throwerId?: number): boolean {
   );
 }
 
-/** Record that a caught pokemon belongs to whoever threw the ball. */
-export function registerCoopCapture(caught: PlayerPokemon | null, throwerId?: number): void {
+/**
+ * Record that a caught pokemon belongs to whoever threw the ball.
+ * Called as the catch succeeds, with the enemy: the party pokemon made from it keeps its `id`, so the catch's account
+ * records (spec 3.7) already go to the thrower's account.
+ */
+export function registerCoopCapture(caught: Pokemon | null, throwerId?: number): void {
   if (coopSession && caught && throwerId !== undefined) {
     coopSession.ownership.set(caught.id, getThrowerRole(coopSession, throwerId));
   }

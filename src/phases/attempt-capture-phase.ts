@@ -3,6 +3,7 @@ import { audioManager } from "#app/global-audio-manager";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
+import { coopCreditsLocalAccount } from "#coop/coop-account";
 import { isCoopBallUnavailable } from "#coop/coop-ball";
 import {
   beginCoopCaptureDecision,
@@ -254,6 +255,7 @@ export class AttemptCapturePhase extends PokemonPhase {
   catch() {
     const { gameData, phaseManager, pokemonInfoContainer, ui } = globalScene;
     const pokemon = this.getPokemon() as EnemyPokemon;
+    registerCoopCapture(pokemon, this.throwerId);
 
     const speciesForm = pokemon.fusionSpecies ? pokemon.getFusionSpeciesForm() : pokemon.getSpeciesForm();
 
@@ -279,7 +281,9 @@ export class AttemptCapturePhase extends PokemonPhase {
 
     pokemonInfoContainer.show(pokemon, true);
 
-    gameData.updateSpeciesDexIvs(pokemon.species.getRootSpeciesId(true), pokemon.ivs);
+    if (coopCreditsLocalAccount(pokemon)) {
+      gameData.updateSpeciesDexIvs(pokemon.species.getRootSpeciesId(true), pokemon.ivs);
+    }
 
     const addStatus = new BooleanHolder(true);
     applyChallenges(ChallengeType.POKEMON_ADD_TO_PARTY, pokemon, addStatus);
