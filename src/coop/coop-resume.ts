@@ -7,6 +7,7 @@
  */
 
 import { globalScene } from "#app/global-scene";
+import { attachCoopChecksums } from "#coop/coop-checksum";
 import { type CoopConnection, type CoopLocalInfo, getLocalCoopInfo, hostCoop } from "#coop/coop-connect";
 import { watchCoopConnection } from "#coop/coop-exit";
 import { arrangeCoopParty } from "#coop/coop-field";
@@ -46,6 +47,7 @@ export async function resumeCoopRun(role: CoopRole, transport: CoopTransport, se
   setCoopSession(session);
   watchCoopConnection(transport);
   attachCoopWaitButton(session);
+  attachCoopChecksums(session);
   restoreCoopRewardCounters(session, { gen: coop.rewardGen, seq: coop.rewardSeq });
 
   globalScene.sessionSlotId = COOP_SESSION_SLOT;

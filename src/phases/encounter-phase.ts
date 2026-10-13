@@ -6,6 +6,7 @@ import { settings } from "#app/global-settings-manager";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { activeOverrides } from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
+import { recordCoopChecksum } from "#coop/coop-checksum";
 import { queueCoopFieldSummons } from "#coop/coop-field";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { getCharVariantFromDialogue } from "#data/dialogue";
@@ -336,6 +337,7 @@ export class EncounterPhase extends BattlePhase {
   }
 
   protected doEncounter(): void {
+    recordCoopChecksum();
     audioManager.playBgm(undefined, true);
     globalScene.updateModifiers(false);
     globalScene.setFieldScale(1);

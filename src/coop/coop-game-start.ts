@@ -12,6 +12,7 @@
 
 import { type GameMode, getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import { attachCoopChecksums } from "#coop/coop-checksum";
 import { watchCoopConnection } from "#coop/coop-exit";
 import type { CoopRole } from "#coop/coop-protocol";
 import { COOP_SESSION_SLOT, CoopSession, setCoopSession } from "#coop/coop-session";
@@ -44,6 +45,7 @@ export function beginCoopSession(
   setCoopSession(session);
   watchCoopConnection(transport);
   attachCoopWaitButton(session);
+  attachCoopChecksums(session);
   return session;
 }
 
