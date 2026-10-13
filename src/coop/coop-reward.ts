@@ -123,7 +123,7 @@ export function openCoopRewardScreen(phase: SelectModifierPhase): void {
   if (isPicker(session)) {
     hideCoopBanner();
   } else {
-    showCoopBanner(coopText("partnerPickingReward"));
+    showCoopBanner(coopText("partnerPickingReward"), true);
   }
   pump(state);
 }

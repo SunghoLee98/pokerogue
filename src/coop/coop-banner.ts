@@ -10,16 +10,21 @@ import { addTextObject } from "#ui/text";
 let banner: Phaser.GameObjects.Text | null = null;
 let shown: string | null = null;
 
-/** Show `text` at the top of the screen, replacing what the banner showed before. */
-export function showCoopBanner(text: string): void {
+/**
+ * Show `text` at the top of the screen, replacing what the banner showed before.
+ * @param onRewardScreen - At the very top, above the reward screen's shop row; otherwise below the held item bar
+ */
+export function showCoopBanner(text: string, onRewardScreen = false): void {
   if (banner?.scene !== globalScene) {
     // Small, in the top left corner: clear of the shop row and the wave and money at the top right.
     banner = addTextObject(3, -globalScene.scaledCanvas.height + 2, "", TextStyle.PARTY);
     banner.setName("coop-banner");
     globalScene.ui.add(banner);
   }
+  banner.setY(-globalScene.scaledCanvas.height + (onRewardScreen ? 2 : 20));
   banner.setText(text).setVisible(true);
-  globalScene.ui.bringToTop(banner);
+  // Behind the other screens (the party screen opened from the reward screen covers it).
+  globalScene.ui.sendToBack(banner);
   shown = text;
 }
 

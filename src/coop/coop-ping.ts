@@ -73,5 +73,5 @@ function markRewardPing({ row, cursor }: PingPayload): void {
   const marker = addTextObject(0, -34, "!", TextStyle.MONEY, { align: "center", fontSize: "96px" }).setOrigin(0.5, 0);
   marker.setName(MARKER_NAME);
   option.add(marker);
-  showCoopBanner(coopText("partnerPinged"));
+  showCoopBanner(coopText("partnerPinged"), true);
 }
