@@ -6,7 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { type CoopConnection, getLocalCoopInfo } from "#coop/coop-connect";
-import { startCoopRun } from "#coop/coop-game-start";
+import { COOP_SESSION_SLOT, startCoopRun } from "#coop/coop-game-start";
 import type { CoopRole } from "#coop/coop-protocol";
 import { coopSession, setCoopSession } from "#coop/coop-session";
 import { createAccountSnapshot } from "#coop/coop-sim-data";
@@ -46,6 +46,10 @@ export function openCoopLobby(
  * Called whenever the game returns to the title screen; does nothing outside co-op.
  */
 export function leaveCoop(): void {
+  // A solo run must never save into the co-op slot.
+  if (globalScene.sessionSlotId === COOP_SESSION_SLOT) {
+    globalScene.sessionSlotId = 0;
+  }
   const transports = new Set<CoopTransport>();
   if (coopLobby) {
     coopLobby.selection.dispose();

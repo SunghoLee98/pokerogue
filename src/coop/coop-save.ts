@@ -3,9 +3,11 @@
  * @module
  */
 
+import { bypassLogin } from "#constants/app-constants";
 import { COOP_PROTOCOL_VERSION, type CoopAccountSnapshot, type CoopRole } from "#coop/coop-protocol";
 import { getCoopRewardCounters } from "#coop/coop-reward";
 import { type CoopSession, coopSession } from "#coop/coop-session";
+import type { GameData } from "#system/game-data";
 
 /** What a co-op run saves besides the solo session fields. Only the host's account keeps the save. */
 export interface CoopSessionSaveData {
@@ -72,4 +74,17 @@ export function createCoopSaveData(session: CoopSession): CoopSessionSaveData {
  */
 export function getCoopSaveFields(): { coop?: CoopSessionSaveData } {
   return coopSession ? { coop: createCoopSaveData(coopSession) } : {};
+}
+
+/**
+ * The save a co-op guest makes in place of `GameData.saveAll` (spec 3.8: only the host keeps the session).
+ * The guest's account data (dex, candies, eggs...) is still saved, the same way and as often as in solo.
+ * @returns `null` outside the guest's client, where `saveAll` saves as usual
+ */
+export function saveCoopGuestData(gameData: GameData, sync: boolean): Promise<boolean> | null {
+  if (coopSession?.localRole !== "guest") {
+    return null;
+  }
+  // `saveSystem` stores locally and, online, on the server; without `sync` solo only stores locally.
+  return sync || bypassLogin ? gameData.saveSystem() : Promise.resolve(true);
 }

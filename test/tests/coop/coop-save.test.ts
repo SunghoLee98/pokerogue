@@ -1,4 +1,6 @@
-import { COOP_PROTOCOL_VERSION, type CoopAccountSnapshot } from "#coop/coop-protocol";
+import { getSessionDataLocalStorageKey, loggedInUser } from "#app/account";
+import { COOP_SESSION_SLOT } from "#coop/coop-game-start";
+import { COOP_PROTOCOL_VERSION, type CoopAccountSnapshot, type CoopRole } from "#coop/coop-protocol";
 import { normalizeCoopSaveData } from "#coop/coop-save";
 import { coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
@@ -8,7 +10,7 @@ import { GameManager } from "#test/framework/game-manager";
 import { CoopTestPartner } from "#test/utils/coop-partner";
 import { createTestStarterPayload, startCoopBattle } from "#test/utils/coop-replay";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const snapshot = (trainerId: number): CoopAccountSnapshot => ({
   trainerId,
@@ -82,6 +84,70 @@ describe("co-op session saves", () => {
 
     expect("coop" in data).toBe(false);
     expect(JSON.stringify(data)).not.toContain('"coop"');
+  });
+});
+
+describe("who saves a co-op session", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+    game.override.battleStyle(null).disableTrainerWaves().enemyMoveset(MoveId.SPLASH);
+  });
+
+  afterEach(() => {
+    setCoopSession(null);
+  });
+
+  const sessionKey = (slot: number) => getSessionDataLocalStorageKey(slot);
+  const systemKey = () => `data_${loggedInUser?.username}`;
+
+  /** Start a co-op battle and use the real `saveAll` (the test framework replaces it). */
+  async function startAs(role: CoopRole): Promise<void> {
+    const partner = new CoopTestPartner(role);
+    await startCoopBattle(game, { role, start: startInfo(), transport: partner.localTransport });
+    vi.mocked(game.scene.gameData.saveAll).mockRestore();
+    localStorage.removeItem(sessionKey(COOP_SESSION_SLOT));
+    localStorage.removeItem(systemKey());
+  }
+
+  it("the host saves the session in the co-op slot", async () => {
+    await startAs("host");
+
+    await expect(game.scene.gameData.saveAll(true, true)).resolves.toBe(true);
+
+    const saved = await game.scene.gameData.getSession(COOP_SESSION_SLOT);
+    expect(saved?.coop?.participants).toBeDefined();
+    expect(saved?.waveIndex).toBe(game.scene.currentBattle.waveIndex);
+    expect(localStorage.getItem(systemKey())).toBeTruthy();
+  });
+
+  it("the guest saves its account data but never the session", async () => {
+    await startAs("guest");
+
+    await expect(game.scene.gameData.saveAll(true, true)).resolves.toBe(true);
+    // Save and quit reads the cached session; the guest has none.
+    await expect(game.scene.gameData.saveAll(true, true, true, true)).resolves.toBe(true);
+
+    expect(localStorage.getItem(sessionKey(COOP_SESSION_SLOT))).toBeFalsy();
+    expect(localStorage.getItem(systemKey())).toBeTruthy();
+  });
+
+  it("solo saves the session in its own slot", async () => {
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+    vi.mocked(game.scene.gameData.saveAll).mockRestore();
+
+    await game.scene.gameData.saveAll(true, true);
+
+    const saved = await game.scene.gameData.getSession(game.scene.sessionSlotId);
+    expect(game.scene.sessionSlotId).not.toBe(COOP_SESSION_SLOT);
+    expect(saved).toBeDefined();
+    expect(saved && "coop" in saved).toBe(false);
   });
 });
 
