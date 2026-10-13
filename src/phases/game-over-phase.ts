@@ -5,6 +5,7 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { bypassLogin } from "#constants/app-constants";
+import { awardCoopVictory } from "#coop/coop-records";
 import { coopSession } from "#coop/coop-session";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
@@ -155,7 +156,7 @@ export class GameOverPhase extends BattlePhase {
       globalScene.time.delayedCall(1000, () => {
         let firstClear = false;
         if (this.isVictory) {
-          if (globalScene.gameMode.isClassic) {
+          if (globalScene.gameMode.isClassic && !awardCoopVictory()) {
             firstClear = globalScene.validateAchv(achvs.CLASSIC_VICTORY);
             globalScene.validateAchv(achvs.UNEVOLVED_CLASSIC_VICTORY);
             globalScene.gameData.gameStats.sessionsWon++;
@@ -248,9 +249,9 @@ export class GameOverPhase extends BattlePhase {
 
     // If Online, execute apiFetch as intended
     // If Offline, execute offlineNewClear() only for victory, a localStorage implementation of newClear daily run checks
-    // Co-op clears are not classic clears, so co-op never asks (spec 4.6); how they count is decided later.
+    // Co-op clears are not classic clears, so co-op never asks (spec 4.6) and gets no first clear rewards (spec 3.7).
     if (coopSession) {
-      doGameOver(!globalScene.gameMode.isDaily);
+      doGameOver(false);
     } else if (!bypassLogin || isLocalServerConnected) {
       pokerogueApi.savedata.session
         .newclear({

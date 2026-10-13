@@ -10,6 +10,11 @@
 import i18next, { type TOptions } from "i18next";
 
 const COOP_TEXT = {
+  coopVictoryName: { en: "Co-op Champions", ko: "협동 챔피언" },
+  coopVictoryDescription: {
+    en: "Beat the game in classic mode with a partner",
+    ko: "파트너와 함께 클래식 모드를 클리어",
+  },
   coopPlay: { en: "Co-op Play", ko: "협동 플레이" },
   hostGame: { en: "Host", ko: "호스트" },
   joinGame: { en: "Join", ko: "참가" },

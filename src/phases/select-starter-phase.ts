@@ -4,6 +4,7 @@ import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { activeOverrides } from "#app/overrides";
 import { Phase } from "#app/phase";
 import { coopLobby, startCoopRunFromLobby } from "#coop/coop-lobby";
+import { recordCoopRunStart } from "#coop/coop-records";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
 import { ChallengeType } from "#enums/challenge-type";
@@ -117,7 +118,9 @@ export class SelectStarterPhase extends Phase {
     overrideHeldItems(party[0]);
     Promise.all(loadPokemonAssets).then(() => {
       audioManager.playBgm(undefined, true);
-      if (globalScene.gameMode.isClassic) {
+      if (recordCoopRunStart()) {
+        // Co-op runs are counted on their own (spec 3.7).
+      } else if (globalScene.gameMode.isClassic) {
         globalScene.gameData.gameStats.classicSessionsPlayed++;
       } else {
         globalScene.gameData.gameStats.endlessSessionsPlayed++;

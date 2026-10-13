@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { withCoopAchvText } from "#coop/coop-achv-text";
 import type { Challenge } from "#data/challenge";
 import {
   FlipStatChallenge,
@@ -672,6 +673,12 @@ export const achvs = {
       && !randomizerChallengesAchvBlock(),
   ).setSecret(),
   BREEDERS_IN_SPACE: new Achv("breedersInSpace", "moon_stone", 50).setSecret(),
+  // Co-op clears do not count as classic clears (spec 3.7); same score as `CLASSIC_VICTORY`.
+  COOP_VICTORY: withCoopAchvText(
+    new Achv("coopVictory", "linking_cord", 250),
+    "coopVictoryName",
+    "coopVictoryDescription",
+  ),
 };
 
 export function initAchievements() {
