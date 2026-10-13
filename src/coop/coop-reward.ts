@@ -124,8 +124,22 @@ export function openCoopRewardScreen(phase: SelectModifierPhase): void {
     hideCoopBanner();
   } else {
     showCoopBanner(coopText("partnerPickingReward"), true);
+    waitWhileOpen(session, phase);
   }
   pump(state);
+}
+
+/**
+ * The player who is not picking waits for the partner as long as the screen is open, and so gets the "save and quit"
+ * button (spec 3.8) in place of the menu.
+ */
+function waitWhileOpen(session: CoopSession, phase: SelectModifierPhase): void {
+  const endWait = session.inputs.holdWait();
+  const end = phase.end;
+  phase.end = function (this: SelectModifierPhase, ...args: Parameters<SelectModifierPhase["end"]>) {
+    endWait();
+    return end.apply(this, args);
+  };
 }
 
 /** The reward counters a co-op save keeps: the newest screen's number and how many events were applied. */

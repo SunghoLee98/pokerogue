@@ -1,6 +1,7 @@
 import { getCoopBannerText } from "#coop/coop-banner";
 import { coopExit } from "#coop/coop-exit";
 import type { CoopAccountSnapshot, CoopMessage, CoopRole } from "#coop/coop-protocol";
+import { getCoopRewardGen } from "#coop/coop-reward";
 import { coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopStartInfo } from "#coop/coop-starter-selection";
 import { coopText } from "#coop/coop-text";
@@ -10,7 +11,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import { CoopTestPartner, synthesizeMoveCommand, waitForCoop } from "#test/utils/coop-partner";
-import { createTestStarterPayload, startCoopBattle } from "#test/utils/coop-replay";
+import { createTestStarterPayload, startCoopBattle, toCoopRewardScreen } from "#test/utils/coop-replay";
 import type { MenuUiHandler } from "#ui/menu-ui-handler";
 import i18next from "i18next";
 import Phaser from "phaser";
@@ -150,5 +151,44 @@ describe("save and quit while waiting for the partner", () => {
     await waitForCoop(() => returnToTitle.mock.calls.length > 0);
 
     expect(partner.received).toContainEqual({ t: "bye", reason: "saveAndQuit" } satisfies CoopMessage);
+  });
+
+  describe("on the reward screen", () => {
+    beforeEach(() => {
+      game.override.moveset([MoveId.HYPER_VOICE, MoveId.SPLASH]);
+    });
+
+    it("offers the button to the player waiting for the picker", async () => {
+      // Wave 1 is the host's to pick on.
+      const partner = await toCoopRewardScreen(game, "guest", 1, startInfo());
+      expect(getCoopWaitButtonText()).toBe(coopText("saveAndQuitButton"));
+
+      pressMenu();
+      pressMenu();
+      await waitForCoop(() => returnToTitle.mock.calls.length > 0);
+      expect(partner.received).toContainEqual({ t: "bye", reason: "saveAndQuit" } satisfies CoopMessage);
+    });
+
+    it("drops the button when the screen closes", async () => {
+      const partner = await toCoopRewardScreen(game, "guest", 1, startInfo());
+      expect(getCoopWaitButtonText()).not.toBeNull();
+
+      partner.send({
+        t: "reward",
+        wave: 1,
+        gen: getCoopRewardGen(),
+        req: 0,
+        by: "host",
+        seq: 0,
+        action: { kind: "skip" },
+      });
+      await waitForCoop(() => !game.isCurrentPhase("SelectModifierPhase"));
+      expect(getCoopWaitButtonText()).toBeNull();
+    });
+
+    it("leaves the menu to the picker", async () => {
+      await toCoopRewardScreen(game, "host", 1, startInfo());
+      expect(getCoopWaitButtonText()).toBeNull();
+    });
   });
 });

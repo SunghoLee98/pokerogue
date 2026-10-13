@@ -201,6 +201,16 @@ export class CoopInputBroker {
     return () => this.waitingListeners.delete(handler);
   }
 
+  /**
+   * Count a wait for the partner that is not a message, such as the partner picking the reward: the game shows the
+   * "save and quit" button while it lasts.
+   * @returns Ends the wait (only the first call counts)
+   */
+  holdWait(): () => void {
+    const end = this.beginWait()<undefined>(() => {});
+    return () => end(undefined);
+  }
+
   /** Count a wait that starts now. @returns A wrapper for the wait's resolver that ends it. */
   private beginWait(): <T>(resolve: (value: T) => void) => (value: T) => void {
     this.setPendingWaits(this.pendingWaits + 1);
