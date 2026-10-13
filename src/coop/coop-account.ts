@@ -51,3 +51,19 @@ export function inheritCoopOwner(previous: Pokemon, next: Pokemon): void {
     coopSession?.ownership.set(next.id, owner);
   }
 }
+
+/**
+ * `EggLapsePhase` in co-op: the eggs count the wave down but do not hatch (spec 3.7). Hatching depends on each
+ * account's eggs and plays scenes on one client only, so it waits until the run is over: eggs that are ready hatch at
+ * the first wave the player wins outside co-op.
+ * @returns Whether co-op took over the phase (the phase then ends without hatching)
+ */
+export function lapseCoopEggs(eggs: readonly { hatchWaves: number }[]): boolean {
+  if (!coopSession) {
+    return false;
+  }
+  for (const egg of eggs) {
+    egg.hatchWaves = Math.max(egg.hatchWaves - 1, 0);
+  }
+  return true;
+}
