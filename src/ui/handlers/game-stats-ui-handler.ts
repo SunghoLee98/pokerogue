@@ -2,6 +2,7 @@ import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { coopDisplayStats } from "#coop/coop-run-history";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
 import { TextStyle } from "#enums/text-style";
@@ -16,6 +17,8 @@ import Phaser from "phaser";
 
 interface DisplayStat {
   label_key?: string;
+  /** The label itself, for stats without a translation key */
+  label?: () => string;
   sourceFunc?: (gameData: GameData) => string;
   hidden?: boolean;
 }
@@ -88,6 +91,7 @@ const displayStats: DisplayStats = {
     label_key: "dailyRunWins",
     sourceFunc: gameData => gameData.gameStats.dailyRunSessionsWon.toString(),
   },
+  ...coopDisplayStats,
   endlessSessionsPlayed: {
     label_key: "endlessRuns",
     sourceFunc: gameData => gameData.gameStats.endlessSessionsPlayed.toString(),
@@ -468,7 +472,9 @@ export class GameStatsUiHandler extends UiHandler {
       const value = stat.sourceFunc?.(this.gameData) ?? "-";
       const valAsInt = Number.parseInt(value);
       this.statLabels[s].setText(
-        !stat.hidden || Number.isNaN(value) || valAsInt ? i18next.t(`gameStatsUiHandler:${stat.label_key}`) : "???",
+        !stat.hidden || Number.isNaN(value) || valAsInt
+          ? (stat.label?.() ?? i18next.t(`gameStatsUiHandler:${stat.label_key}`))
+          : "???",
       );
       this.statValues[s].setText(value);
     });

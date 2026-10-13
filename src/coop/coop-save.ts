@@ -28,6 +28,8 @@ export interface CoopSessionSaveData {
   rewardGen: number;
   /** The number of reward screen events applied */
   rewardSeq: number;
+  /** Only in run history entries: the role of the player whose history it is */
+  localRole?: CoopRole;
 }
 
 /**

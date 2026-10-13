@@ -11,6 +11,11 @@ import i18next, { type TOptions } from "i18next";
 
 const COOP_TEXT = {
   coopVictoryName: { en: "Co-op Champions", ko: "협동 챔피언" },
+  statCoopRuns: { en: "Co-op Runs", ko: "협동 런" },
+  statCoopWins: { en: "Co-op Wins", ko: "협동 클리어" },
+  runHistorySoloTab: { en: "< Solo runs >", ko: "< 솔로 기록 >" },
+  runHistoryCoopTab: { en: "< Co-op runs >", ko: "< 협동 기록 >" },
+  runHistoryCoopMode: { en: "Co-op: {{partner}}", ko: "협동: {{partner}}" },
   coopVictoryDescription: {
     en: "Beat the game in classic mode with a partner",
     ko: "파트너와 함께 클래식 모드를 클리어",

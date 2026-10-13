@@ -5,7 +5,7 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { bypassLogin } from "#constants/app-constants";
-import { awardCoopVictory } from "#coop/coop-records";
+import { awardCoopVictory, getCoopRunHistoryFields } from "#coop/coop-records";
 import { coopSession } from "#coop/coop-session";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
@@ -342,6 +342,7 @@ export class GameOverPhase extends BattlePhase {
       mysteryEncounterType: globalScene.currentBattle.mysteryEncounter?.encounterType ?? -1,
       mysteryEncounterSaveData: globalScene.mysteryEncounterSaveData,
       playerFaints: globalScene.arena.playerFaints,
+      ...getCoopRunHistoryFields(),
     } as SessionSaveData;
   }
 }

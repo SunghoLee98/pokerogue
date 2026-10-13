@@ -192,6 +192,11 @@ export class MockText implements MockGameObject {
     return this;
   }
 
+  appendText(text: string, addCR = true): this {
+    this.text = `${this.text ?? ""}${addCR && this.text ? "\n" : ""}${text}`;
+    return this;
+  }
+
   setAngle(_angle): this {
     // Sets the angle of this Game Object.
     // return this.phaserText.setAngle(angle);

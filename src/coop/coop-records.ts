@@ -7,6 +7,8 @@
  */
 
 import { globalScene } from "#app/global-scene";
+import type { CoopAccountSnapshot } from "#coop/coop-protocol";
+import { type CoopSessionSaveData, createCoopSaveData } from "#coop/coop-save";
 import { coopSession } from "#coop/coop-session";
 import { achvs } from "#system/achv";
 
@@ -33,4 +35,31 @@ export function awardCoopVictory(): boolean {
   globalScene.validateAchv(achvs.COOP_VICTORY);
   globalScene.gameData.gameStats.coopSessionsWon++;
   return true;
+}
+
+/**
+ * The co-op fields of a run history entry (`GameOverPhase.getRunHistoryEntry`): the run's `coop` block with the
+ * local player's role, so the history can tell co-op runs apart and name the partner. The account snapshots are left
+ * out, as the history only shows the run.
+ * @returns `{ coop }` in co-op; nothing outside it
+ */
+export function getCoopRunHistoryFields(): { coop?: CoopSessionSaveData } {
+  const session = coopSession;
+  if (!session) {
+    return {};
+  }
+  const data = createCoopSaveData(session);
+  const withoutLists = (snapshot: CoopAccountSnapshot): CoopAccountSnapshot => ({
+    ...snapshot,
+    caughtSpecies: [],
+    eggMoves: {},
+    unlocks: [],
+  });
+  return {
+    coop: {
+      ...data,
+      accounts: { host: withoutLists(data.accounts.host), guest: withoutLists(data.accounts.guest) },
+      localRole: session.localRole,
+    },
+  };
 }
