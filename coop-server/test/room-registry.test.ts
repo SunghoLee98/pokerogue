@@ -28,6 +28,13 @@ describe("RoomRegistry", () => {
     assert.equal(codes.size, 100);
   });
 
+  it("never uses characters that look alike in the game font", () => {
+    const registry = new RoomRegistry();
+    for (let i = 0; i < 500; i++) {
+      assert.doesNotMatch(registry.createRoom(), /[0O1I]/);
+    }
+  });
+
   it("retries when a generated code is already taken", () => {
     // The first two codes are identical, so the second room must draw again.
     const values = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];

@@ -78,7 +78,8 @@ export function startRelayServer(options: { port: number; host?: string }): Prom
     }
   };
 
-  const reject = (socket: WebSocket, reason: "notFound" | "full" | "badRequest"): void => {
+  const reject = (socket: WebSocket, reason: "notFound" | "full" | "badRequest", code?: string | null): void => {
+    console.log(`coop relay: rejected ${code ?? "(no code)"}: ${reason} (${sockets.size} rooms open)`);
     sendControl(socket, { t: "relay:error", reason });
     socket.close();
   };
@@ -92,16 +93,17 @@ export function startRelayServer(options: { port: number; host?: string }): Prom
       const newCode = registry.createRoom();
       attach(socket, newCode, "host");
       sendControl(socket, { t: "relay:code", code: newCode });
+      console.log(`coop relay: room ${newCode} created`);
       return;
     }
     if (code === null || (rejoin !== null && rejoin !== "host" && rejoin !== "guest")) {
-      reject(socket, "badRequest");
+      reject(socket, "badRequest", code);
       return;
     }
     const slot: RelaySlot = rejoin ?? "guest";
     const result = registry.join(code, slot);
     if (result !== "ok") {
-      reject(socket, result);
+      reject(socket, result, code);
       return;
     }
     attach(socket, code, slot);

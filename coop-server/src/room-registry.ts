@@ -3,7 +3,8 @@
 
 import type { RelaySlot } from "./relay-protocol.ts";
 
-const CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+/** No 0/O or 1/I: they look alike in the game font. */
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 6;
 /** A room nobody joined is dropped after this long. */
 const UNJOINED_ROOM_TTL_MS = 10 * 60_000;
