@@ -1,5 +1,6 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
+import { routeCoopOptionSelect } from "#coop/coop-choice";
 import { getDailyForcedBiomes } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
 import { BiomeId } from "#enums/biome-id";
@@ -72,7 +73,7 @@ export class SelectBiomePhase extends BattlePhase {
           inputDelay: 1000,
           yOffset: 48,
         };
-        globalScene.ui.setMode(UiMode.OPTION_SELECT, optionSelectConfig);
+        globalScene.ui.setMode(UiMode.OPTION_SELECT, routeCoopOptionSelect(optionSelectConfig));
       } else {
         this.setNextBiomeAndEnd(randSeedItem(biomes));
       }

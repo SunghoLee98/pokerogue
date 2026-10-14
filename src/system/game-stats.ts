@@ -10,6 +10,10 @@ export class GameStats {
   public dailyRunSessionsPlayed: number;
   public dailyRunSessionsWon: number;
   public endlessSessionsPlayed: number;
+  /** Co-op runs started; they do not count as classic runs (spec 3.7) */
+  public coopSessionsPlayed: number;
+  /** Co-op runs won; they do not count as classic wins */
+  public coopSessionsWon: number;
   public highestEndlessWave: number;
   public highestLevel: number;
   public highestMoney: number;
@@ -48,6 +52,8 @@ export class GameStats {
     this.dailyRunSessionsPlayed = source?.dailyRunSessionsPlayed || 0;
     this.dailyRunSessionsWon = source?.dailyRunSessionsWon || 0;
     this.endlessSessionsPlayed = source?.endlessSessionsPlayed || 0;
+    this.coopSessionsPlayed = source?.coopSessionsPlayed || 0;
+    this.coopSessionsWon = source?.coopSessionsWon || 0;
     this.highestEndlessWave = source?.highestEndlessWave || 0;
     this.highestLevel = source?.highestLevel || 0;
     this.highestMoney = source?.highestMoney || 0;

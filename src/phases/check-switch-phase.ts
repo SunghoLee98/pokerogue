@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { takeOverCoopSwitchQuestion } from "#coop/coop-switch-question";
 import { BattleStyle } from "#enums/battle-style";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { SwitchType } from "#enums/switch-type";
@@ -23,6 +24,10 @@ export class CheckSwitchPhase extends BattlePhase {
 
   public override start(): void {
     super.start();
+
+    if (takeOverCoopSwitchQuestion(this.fieldIndex, () => this.end())) {
+      return;
+    }
 
     const pokemon = globalScene.getPlayerField()[this.fieldIndex];
 

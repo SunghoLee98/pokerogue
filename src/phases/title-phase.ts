@@ -8,6 +8,12 @@ import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { activeOverrides } from "#app/overrides";
 import { Phase } from "#app/phase";
 import { bypassLogin } from "#constants/app-constants";
+import { isCoopAvailable } from "#coop/coop-connect";
+import { createCoopGameMode } from "#coop/coop-game-start";
+import { coopLobby, leaveCoop } from "#coop/coop-lobby";
+import { queueCoopResumeSummons } from "#coop/coop-resume";
+import { coopSaveServer, isCoopSessionSlot } from "#coop/coop-save";
+import { type CoopTitleMenuCallbacks, createCoopTitleOption, showHeldCoopRoom } from "#coop/coop-title-menu";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-run";
 import { modifierTypes } from "#data/data-lists";
 import { Gender } from "#data/gender";
@@ -35,6 +41,7 @@ export class TitlePhase extends Phase {
 
   async start(): Promise<void> {
     super.start();
+    leaveCoop();
 
     globalScene.ui.clearText();
     globalScene.ui.fadeIn(250);
@@ -46,8 +53,31 @@ export class TitlePhase extends Phase {
       audioManager.playBgm("title", true);
     }
 
+    // A co-op partner dropped out of the run: wait for them in the same room instead of showing the title options.
+    if (showHeldCoopRoom(this.getCoopCallbacks())) {
+      return;
+    }
+
     const lastSlot = await this.checkLastSaveSlot();
     await this.showOptions(lastSlot);
+  }
+
+  /** What the co-op menu does once connected, cancelled or resumed. */
+  private getCoopCallbacks(): CoopTitleMenuCallbacks {
+    return {
+      onConnected: () => {
+        this.gameMode = GameModes.CLASSIC;
+        this.end();
+      },
+      onCancel: () => {
+        globalScene.phaseManager.toTitleScreen();
+        super.end();
+      },
+      onResumed: () => {
+        this.loaded = true;
+        this.end();
+      },
+    };
   }
 
   /**
@@ -57,7 +87,8 @@ export class TitlePhase extends Phase {
    * Returns `NO_SAVE_SLOT` if not logged in or no session was found.
    */
   private async checkLastSaveSlot(): Promise<number> {
-    if (loggedInUser == null) {
+    // The co-op slot is only continued from the co-op menu.
+    if (loggedInUser == null || isCoopSessionSlot(loggedInUser.lastSessionSlot)) {
       return NO_SAVE_SLOT;
     }
     try {
@@ -188,6 +219,10 @@ export class TitlePhase extends Phase {
         keepOpen: true,
       },
     );
+    if (isCoopAvailable() && (await coopSaveServer.supportsCoop())) {
+      const coopOption = createCoopTitleOption(this.getCoopCallbacks());
+      options.splice(options.findIndex(o => o.label === i18next.t("menu:newGame")) + 1, 0, coopOption);
+    }
     const config: OptionSelectModeConfig = { options, blockCancelButton: true };
     await ui.setMode(UiMode.TITLE, config);
   }
@@ -352,7 +387,7 @@ export class TitlePhase extends Phase {
   // TODO: Refactor this
   end(): void {
     if (!this.loaded && !globalScene.gameMode.isDaily) {
-      globalScene.gameMode = getGameMode(this.gameMode);
+      globalScene.gameMode = coopLobby ? createCoopGameMode() : getGameMode(this.gameMode);
       if (this.gameMode === GameModes.CHALLENGE) {
         globalScene.phaseManager.pushNew("SelectChallengePhase");
       } else {
@@ -365,7 +400,7 @@ export class TitlePhase extends Phase {
 
     globalScene.phaseManager.pushNew("EncounterPhase", this.loaded);
 
-    if (this.loaded) {
+    if (this.loaded && !queueCoopResumeSummons()) {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle().length;
 
       globalScene.phaseManager.pushNew("SummonPhase", 0, true, true);

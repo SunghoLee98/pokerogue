@@ -5,6 +5,8 @@ import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { BASE_HIDDEN_ABILITY_RATE, BASE_SHINY_CHANCE } from "#balance/rates";
+import { getCoopEncounterDouble } from "#coop/coop-battle-rules";
+import { routeCoopOptionSelect, setCoopPartySelectMode } from "#coop/coop-choice";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { modifierTypes } from "#data/data-lists";
 import type { IEggOptions } from "#data/egg";
@@ -191,7 +193,7 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
     enemyPokemon.leaveField(true, true, true);
   });
   battle.enemyParty = [];
-  battle.double = doubleBattle;
+  battle.double = getCoopEncounterDouble(doubleBattle);
 
   // ME levels are modified by an additive value that scales with wave index
   // Base scaling: Every 10 waves, modifier gets +1 level
@@ -545,7 +547,7 @@ export function selectPokemonForOption(
     const modeToSetOnExit = globalScene.ui.mode;
 
     // Open party screen to choose pokemon
-    globalScene.ui.setMode(
+    setCoopPartySelectMode(
       UiMode.PARTY,
       PartyUiMode.SELECT,
       -1,
@@ -605,7 +607,7 @@ export function selectPokemonForOption(
           if (fullOptions[0]?.onHover) {
             fullOptions[0].onHover();
           }
-          globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, config);
+          globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, routeCoopOptionSelect(config));
         };
 
         const textPromptKey = globalScene.currentBattle.mysteryEncounter?.selectedOption?.dialogue?.secondOptionPrompt;
@@ -651,12 +653,12 @@ export function selectOptionThenPokemon(
       if (fullOptions[0]?.onHover) {
         fullOptions[0].onHover();
       }
-      globalScene.ui.setMode(UiMode.OPTION_SELECT, config);
+      globalScene.ui.setMode(UiMode.OPTION_SELECT, routeCoopOptionSelect(config));
     };
 
     const selectPokemonAfterOption = (selectedOptionIndex: number) => {
       // Open party screen to choose a Pokemon
-      globalScene.ui.setMode(
+      setCoopPartySelectMode(
         UiMode.PARTY,
         PartyUiMode.SELECT,
         -1,

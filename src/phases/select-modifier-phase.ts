@@ -1,6 +1,12 @@
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { activeOverrides } from "#app/overrides";
+import {
+  openCoopRewardScreen,
+  submitCoopRewardAction,
+  submitCoopRewardChoice,
+  wrapCoopModifierSelect,
+} from "#coop/coop-reward";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { ModifierTier } from "#enums/modifier-tier";
 import { PartyUiMode } from "#enums/party-ui-mode";
@@ -78,6 +84,7 @@ export class SelectModifierPhase extends BattlePhase {
     const modifierCount = this.getModifierCount();
 
     this.typeOptions = this.getModifierTypeOptions(modifierCount);
+    openCoopRewardScreen(this);
 
     const modifierSelectCallback = (rowCursor: number, cursor: number) => {
       if (rowCursor < 0 || cursor < 0) {
@@ -85,6 +92,9 @@ export class SelectModifierPhase extends BattlePhase {
           const skipRewardConfirmOptions: ConfirmModeConfig = {
             yesHandler: () => {
               globalScene.ui.revertMode();
+              if (submitCoopRewardAction(this, { kind: "skip" })) {
+                return;
+              }
               globalScene.ui.setMode(UiMode.MESSAGE);
               super.end();
             },
@@ -130,6 +140,9 @@ export class SelectModifierPhase extends BattlePhase {
   // Pick a modifier from among the rewards and apply it
   private selectRewardModifierOption(cursor: number, modifierSelectCallback: ModifierSelectCallback): boolean {
     if (this.typeOptions.length === 0) {
+      if (submitCoopRewardAction(this, { kind: "skip" })) {
+        return true;
+      }
       globalScene.ui.clearText();
       globalScene.ui.setMode(UiMode.MESSAGE);
       super.end();
@@ -179,7 +192,7 @@ export class SelectModifierPhase extends BattlePhase {
       } else {
         this.openModifierMenu(modifierType, cost, modifierSelectCallback);
       }
-    } else {
+    } else if (!submitCoopRewardChoice(this)) {
       this.applyModifier(modifierType.newModifier()!, cost);
     }
     return cost === -1;
@@ -224,6 +237,17 @@ export class SelectModifierPhase extends BattlePhase {
           && fromSlotIndex !== toSlotIndex
           && itemIndex > -1
         ) {
+          if (
+            submitCoopRewardAction(this, {
+              kind: "transfer",
+              from: fromSlotIndex,
+              itemIndex,
+              quantity: itemQuantity,
+              to: toSlotIndex,
+            })
+          ) {
+            return;
+          }
           const itemModifiers = globalScene.findModifiers(
             m => m instanceof PokemonHeldItemModifier && m.isTransferable && m.pokemonId === party[fromSlotIndex].id,
           ) as PokemonHeldItemModifier[];
@@ -314,6 +338,9 @@ export class SelectModifierPhase extends BattlePhase {
           && spliceSlotIndex < 6
           && fromSlotIndex !== spliceSlotIndex
         ) {
+          if (submitCoopRewardChoice(this, { slot: fromSlotIndex, splice: spliceSlotIndex })) {
+            return;
+          }
           globalScene.ui.setMode(UiMode.MODIFIER_SELECT, this.isPlayer()).then(() => {
             const modifier = modifierType.newModifier(party[fromSlotIndex], party[spliceSlotIndex])!; //TODO: is the bang correct?
             this.applyModifier(modifier, cost, true);
@@ -353,6 +380,9 @@ export class SelectModifierPhase extends BattlePhase {
       -1,
       (slotIndex: number, option: PartyOption) => {
         if (slotIndex < 6) {
+          if (submitCoopRewardChoice(this, { slot: slotIndex, partyOption: option })) {
+            return;
+          }
           globalScene.ui.setMode(UiMode.MODIFIER_SELECT, this.isPlayer()).then(() => {
             const modifier = isMoveModifier
               ? modifierType.newModifier(party[slotIndex], option - PartyOption.MOVE_1)
@@ -404,7 +434,7 @@ export class SelectModifierPhase extends BattlePhase {
       UiMode.MODIFIER_SELECT,
       this.isPlayer(),
       this.typeOptions,
-      modifierSelectCallback,
+      wrapCoopModifierSelect(this, modifierSelectCallback),
       this.getRerollCost(globalScene.lockModifierTiers),
     );
   }

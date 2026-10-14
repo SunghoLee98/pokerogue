@@ -1,5 +1,11 @@
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
+import {
+  filterCoopRunHistory,
+  getCoopRunModeLabel,
+  showCoopRunHistoryTab,
+  switchCoopRunHistoryTab,
+} from "#coop/coop-run-history";
 import { BattleType } from "#enums/battle-type";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
@@ -75,6 +81,7 @@ export class RunHistoryUiHandler extends MessageUiHandler {
 
     this.getUi().bringToTop(this.runSelectContainer);
     this.runSelectContainer.setVisible(true);
+    showCoopRunHistoryTab(this.runSelectContainer);
     this.populateRuns().then(() => {
       this.setScrollCursor(0);
       this.setCursor(0);
@@ -97,6 +104,9 @@ export class RunHistoryUiHandler extends MessageUiHandler {
    */
   override processInput(button: Button): boolean {
     const ui = this.getUi();
+    if (switchCoopRunHistoryTab(button, this)) {
+      return true;
+    }
 
     let success = false;
     const error = false;
@@ -155,7 +165,7 @@ export class RunHistoryUiHandler extends MessageUiHandler {
    * In the for loop, each run is processed to create an RunEntryContainer used to display and store the run's unique information
    */
   private async populateRuns() {
-    const response = await globalScene.gameData.getRunHistoryData();
+    const response = filterCoopRunHistory(await globalScene.gameData.getRunHistoryData());
     const timestamps = Object.keys(response);
     if (timestamps.length === 0) {
       this.showEmpty();
@@ -368,7 +378,7 @@ class RunEntryContainer extends Phaser.GameObjects.Container {
         mode = i18next.t("gameMode:challenge");
         break;
     }
-    gameModeLabel.appendText(mode, false);
+    gameModeLabel.appendText(getCoopRunModeLabel(run, mode), false);
     if (data.gameMode === GameModes.SPLICED_ENDLESS) {
       const splicedIcon = globalScene.add.image(0, 0, "icon_spliced");
       splicedIcon.setScale(0.75);

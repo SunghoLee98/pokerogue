@@ -1,5 +1,6 @@
 import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
+import type { CoopSessionSaveData } from "#coop/coop-save";
 import type { BattleType } from "#enums/battle-type";
 import type { GameModes } from "#enums/game-modes";
 import type { MoveId } from "#enums/move-id";
@@ -73,6 +74,8 @@ export interface SessionSaveData {
    * Counts the amount of pokemon fainted in your party during the current arena encounter.
    */
   playerFaints: number;
+  /** Co-op runs only: who plays, who owns which pokemon and the co-op counters */
+  coop?: CoopSessionSaveData;
 }
 
 export interface Unlocks {

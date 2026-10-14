@@ -12,7 +12,7 @@ import type { GameMode } from "#app/game-mode";
 import { getGameMode } from "#app/game-mode";
 import { audioManager } from "#app/global-audio-manager";
 import { timedEventManager } from "#app/global-event-manager";
-import { initGlobalScene } from "#app/global-scene";
+import { globalScene, initGlobalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { InputsController } from "#app/inputs-controller";
@@ -28,6 +28,8 @@ import { TurnCommandManager } from "#app/turn-command-manager";
 import { UiInputs } from "#app/ui-inputs";
 import { STARTING_WAVE } from "#balance/misc";
 import { FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
+import { coopForcesDouble } from "#coop/coop-battle-rules";
+import { isCoopExcludedEncounter } from "#coop/coop-encounter";
 import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets } from "#data/battle-anims";
 import { getDailyMysteryEncounter } from "#data/daily-run";
 import { allMoves, biomeDepths, modifierTypes } from "#data/data-lists";
@@ -1279,6 +1281,8 @@ export class BattleScene extends SceneBase {
     }
     resolved.double = this.checkIsDouble(resolved as NewBattleConstructedProps);
 
+    globalScene.phaseManager.unshiftNew("PartyReorderSwitchPhase");
+
     const lastBattle: Battle | null = this.currentBattle;
     const maxExpLevel = this.getMaxExpLevel();
 
@@ -1486,6 +1490,9 @@ export class BattleScene extends SceneBase {
     const doubleBattleOverride = this.doCheckDoubleOverride(waveIndex);
     if (doubleBattleOverride != null) {
       return doubleBattleOverride;
+    }
+    if (coopForcesDouble()) {
+      return true;
     }
 
     // Edge cases
@@ -3565,7 +3572,9 @@ export class BattleScene extends SceneBase {
     const previousEncounter = this.mysteryEncounterSaveData.encounteredEvents.at(-1)?.type ?? null; // TODO: This being `null` is a bit weird
     const disabledEncounters = timedEventManager.getEventMysteryEncountersDisabled();
     const biomeMysteryEncounters =
-      mysteryEncountersByBiome.get(this.arena.biomeId)?.filter(enc => !disabledEncounters.includes(enc)) ?? [];
+      mysteryEncountersByBiome
+        .get(this.arena.biomeId)
+        ?.filter(enc => !disabledEncounters.includes(enc) && !isCoopExcludedEncounter(enc)) ?? [];
     // If no valid encounters exist at tier, checks next tier down, continuing until there are some encounters available
     while (availableEncounters.length === 0 && tier !== null) {
       availableEncounters = biomeMysteryEncounters

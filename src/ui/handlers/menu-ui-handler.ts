@@ -4,6 +4,7 @@ import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { bypassLogin, isApp, isBeta, isDev } from "#constants/app-constants";
+import { coopSaveAndQuit } from "#coop/coop-wait-button";
 import { AdminMode, getAdminModeName } from "#enums/admin-mode";
 import { Button } from "#enums/buttons";
 import { GameDataType } from "#enums/game-data-type";
@@ -660,6 +661,11 @@ export class MenuUiHandler extends OptionSelectUiHandler {
         }
         success = true;
         const doSaveQuit = () => {
+          // Co-op tells the partner and keeps the host's save from the start of the wave.
+          if (coopSaveAndQuit()) {
+            ui.revertMode();
+            return;
+          }
           ui.setMode(UiMode.LOADING, {
             buttonActions: [],
             fadeOut: () =>

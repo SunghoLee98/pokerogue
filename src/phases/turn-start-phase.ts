@@ -1,6 +1,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { TurnCommand } from "#app/battle";
 import { globalScene } from "#app/global-scene";
+import { flushCoopTurnCommands } from "#coop/coop-turn-commands";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
@@ -50,6 +51,7 @@ export class TurnStartPhase extends FieldPhase {
   // Also need a clearer distinction between "turn command" and queued moves
   start() {
     super.start();
+    flushCoopTurnCommands();
 
     const field = globalScene.getField();
     const moveOrder = this.getCommandOrder();
@@ -117,7 +119,12 @@ export class TurnStartPhase extends FieldPhase {
         this.handleFightCommand(turnCommand, pokemon);
         break;
       case Command.BALL:
-        globalScene.phaseManager.unshiftNew("AttemptCapturePhase", turnCommand.targets![0] % 2, turnCommand.cursor!); //TODO: is the bang correct here?
+        globalScene.phaseManager.unshiftNew(
+          "AttemptCapturePhase",
+          turnCommand.targets![0] % 2,
+          turnCommand.cursor!,
+          pokemon.id,
+        ); //TODO: is the bang correct here?
         break;
       case Command.POKEMON:
         globalScene.phaseManager.unshiftNew(

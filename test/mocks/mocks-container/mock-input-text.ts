@@ -16,6 +16,10 @@ export class MockInputText extends MockText {
 
   setCursorPosition(_value: number) {}
 
+  setFocus() {
+    return this;
+  }
+
   scrollToBottom() {}
 
   resize(_width: number, _height: number) {}

@@ -3,6 +3,8 @@ import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { inheritCoopOwner } from "#coop/coop-account";
+import { coopRandInt } from "#coop/coop-random";
 import { Gender, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import { getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
@@ -38,7 +40,7 @@ import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encou
 import { PartySizeRequirement } from "#mystery-encounters/mystery-encounter-requirements";
 import { PokemonData } from "#system/pokemon-data";
 import type { OptionSelectItem } from "#types/ui-types";
-import { randInt, randSeedInt, randSeedItem, randSeedShuffle } from "#utils/common";
+import { randSeedInt, randSeedItem, randSeedShuffle } from "#utils/common";
 import { getEnumKeys } from "#utils/enums";
 import { getRandomLocaleEntry } from "#utils/i18n";
 import { toCamelCase } from "#utils/strings";
@@ -220,7 +222,7 @@ export const GlobalTradeSystemEncounter: MysteryEncounter = MysteryEncounterBuil
         // Set data properly, then generate the new Pokemon's assets
         receivedPokemonData.passive = tradedPokemon.passive;
         // Pokeball to Ultra ball, randomly
-        receivedPokemonData.pokeball = randInt(4) as PokeballType;
+        receivedPokemonData.pokeball = coopRandInt(4) as PokeballType;
         const dataSource = new PokemonData(receivedPokemonData);
         const newPlayerPokemon = globalScene.addPlayerPokemon(
           receivedPokemonData.species,
@@ -235,6 +237,7 @@ export const GlobalTradeSystemEncounter: MysteryEncounter = MysteryEncounterBuil
           dataSource,
         );
         globalScene.getPlayerParty().push(newPlayerPokemon);
+        inheritCoopOwner(tradedPokemon, newPlayerPokemon);
         await newPlayerPokemon.loadAssets();
 
         for (const mod of modifiers) {
@@ -324,7 +327,7 @@ export const GlobalTradeSystemEncounter: MysteryEncounter = MysteryEncounterBuil
 
         // Set data properly, then generate the new Pokemon's assets
         receivedPokemonData.passive = tradedPokemon.passive;
-        receivedPokemonData.pokeball = randInt(4) as PokeballType;
+        receivedPokemonData.pokeball = coopRandInt(4) as PokeballType;
         const dataSource = new PokemonData(receivedPokemonData);
         const newPlayerPokemon = globalScene.addPlayerPokemon(
           receivedPokemonData.species,
@@ -339,6 +342,7 @@ export const GlobalTradeSystemEncounter: MysteryEncounter = MysteryEncounterBuil
           dataSource,
         );
         globalScene.getPlayerParty().push(newPlayerPokemon);
+        inheritCoopOwner(tradedPokemon, newPlayerPokemon);
         await newPlayerPokemon.loadAssets();
 
         for (const mod of modifiers) {

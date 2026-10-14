@@ -1,6 +1,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { recordCoopChecksum } from "#coop/coop-checksum";
 import { TerrainType } from "#data/terrain";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { WeatherType } from "#enums/weather-type";
@@ -79,6 +80,7 @@ export class TurnEndPhase extends FieldPhase {
       globalScene.arena.trySetTerrain(TerrainType.NONE);
     }
 
+    recordCoopChecksum();
     this.end();
   }
 }

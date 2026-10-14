@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { activeOverrides } from "#app/overrides";
+import { awaitCoopLearnMove, noteCoopLearnedMove, reportCoopLearnMove } from "#coop/coop-pokemon-choice";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
@@ -61,9 +62,14 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     globalScene.ui.setMode(this.messageMode);
     if (currentMoveset.length < 4) {
       this.learnMove(currentMoveset.length, move, pokemon);
-    } else {
+    } else if (!awaitCoopLearnMove(this, pokemon, move)) {
       this.replaceMoveCheck(move, pokemon);
     }
+  }
+
+  public override end(): void {
+    reportCoopLearnMove(this);
+    super.end();
   }
 
   /**
@@ -191,6 +197,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    * @param Pokemon - The Pokemon learning the move
    */
   private async learnMove(index: number, move: Move, pokemon: Pokemon, textMessage?: string): Promise<void> {
+    noteCoopLearnedMove(this, index);
     if (this.learnMoveType === LearnMoveType.TM) {
       if (!pokemon.usedTMs.includes(this.moveId)) {
         pokemon.usedTMs.push(this.moveId);

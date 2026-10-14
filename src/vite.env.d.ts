@@ -22,6 +22,7 @@ interface ImportMetaEnv {
   readonly VITE_GITHUB_URL: string;
   readonly VITE_REDDIT_URL: string;
   readonly VITE_DONATE_URL: string;
+  readonly VITE_COOP_RELAY_URL?: string;
 }
 
 // tell vite to disallow missing env vars

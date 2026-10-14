@@ -27,6 +27,7 @@ ls:
 ignore:
    - .pnpm-store
    - node_modules
+   - coop-server/node_modules
    - .vscode
    - .github
    - .git
@@ -36,3 +37,4 @@ ignore:
    - .devcontainer
    - "LICENSES"
    - .idea
+   - .claude

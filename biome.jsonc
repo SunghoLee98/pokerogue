@@ -27,6 +27,7 @@
       "!.github/**/*.*", // workaround due to bug/design limitation, should be `"!.github"`
       ".github/**/*.ts",
       ".github/**/*.mts",
+      "!!.claude", // third-party Claude Code skills (obra/superpowers), kept verbatim
       "!!assets",
       "!!coverage",
       "!!dist*",

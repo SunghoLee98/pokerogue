@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { activeOverrides } from "#app/overrides";
 import { Phase } from "#app/phase";
+import { lapseCoopEggs } from "#coop/coop-account";
 import type { Egg } from "#data/egg";
 import { EGG_SEED } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
@@ -24,6 +25,11 @@ export class EggLapsePhase extends Phase {
 
   start() {
     super.start();
+
+    if (lapseCoopEggs(globalScene.gameData.eggs)) {
+      this.end();
+      return;
+    }
 
     const eggsToHatch: Egg[] = globalScene.gameData.eggs.filter((egg: Egg) => {
       return activeOverrides.EGG_IMMEDIATE_HATCH_OVERRIDE ? true : --egg.hatchWaves < 1;

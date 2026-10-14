@@ -6,6 +6,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { activeOverrides } from "#app/overrides";
 import { FusionSpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import { FRIENDSHIP_GAIN_FROM_RARE_CANDY } from "#balance/starters";
+import { coopCreditsLocalAccount } from "#coop/coop-account";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allMoves, modifierTypes } from "#data/data-lists";
 import { getLevelTotalExp } from "#data/exp";
@@ -2250,7 +2251,9 @@ export class PokemonNatureChangeModifier extends ConsumablePokemonModifier {
    */
   override apply(playerPokemon: PlayerPokemon): boolean {
     playerPokemon.setCustomNature(this.nature);
-    globalScene.gameData.unlockSpeciesNature(playerPokemon.species, this.nature);
+    if (coopCreditsLocalAccount(playerPokemon)) {
+      globalScene.gameData.unlockSpeciesNature(playerPokemon.species, this.nature);
+    }
 
     return true;
   }

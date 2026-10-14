@@ -1,4 +1,4 @@
-import { PLAYER_PARTY_MAX_SIZE, VALUE_REDUCTION_MAX } from "#app/constants";
+import { VALUE_REDUCTION_MAX } from "#app/constants";
 import { eventBus } from "#app/event-bus";
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
@@ -13,6 +13,12 @@ import {
   getValueReductionCandyCounts,
   POKERUS_STARTER_COUNT,
 } from "#balance/starters";
+import { getStarterPickLimit } from "#coop/coop-starter-rules";
+import {
+  type CoopStarterSelectController,
+  type CoopStarterSelectLayout,
+  createCoopStarterSelectUi,
+} from "#coop/coop-starter-select-ui";
 import { allMoves } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { getNatureName } from "#data/nature";
@@ -207,6 +213,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   //variables to keep track of the dynamically rendered list of instruction prompts for starter select
 
   private starterSelectCallback: StarterSelectCallback | null;
+  private coopUi: CoopStarterSelectController | null = null;
 
   private starterPreferences: AllStarterPreferences;
   private originalStarterPreferences: AllStarterPreferences;
@@ -612,12 +619,32 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.setCursor(0);
       this.tryUpdateValue(0);
 
+      this.setUpCoop();
+
       handleTutorial(Tutorial.STARTER_SELECT);
 
       return true;
     }
 
     return false;
+  }
+
+  /** Add the co-op controls to the screen when in a co-op lobby. */
+  private setUpCoop(): void {
+    const coopLayout: CoopStarterSelectLayout = {
+      iconPosition: i => [teamWindowX + 7, calcStarterIconY(i)],
+      slotIcons: this.partyIcons,
+      // Bottom right of the starter grid, left of its scroll bar and just above a one-line message box
+      statusPosition: [teamWindowX - 11, 144],
+      // Above the team column and the starter grid, below the panels, overlays and message box drawn after them
+      drawBelow: this.starterSummary,
+    };
+    this.coopUi = createCoopStarterSelectUi(this.starterSelectContainer, coopLayout, starters => {
+      this.getUi().setMode(UiMode.STARTER_SELECT);
+      const callback = this.starterSelectCallback;
+      this.starterSelectCallback = null;
+      callback?.(starters);
+    });
   }
 
   /**
@@ -1067,7 +1094,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         // This prevents repeated rapid button presses from adding duplicate starters to the party
         this.blockInput = true;
 
-        if (this.partyStarterIds.length >= 6) {
+        if (this.partyStarterIds.length >= getStarterPickLimit()) {
           this.blockInput = false;
           error = true;
           break;
@@ -1597,7 +1624,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       !isDupe
       && isValidForChallenge
       && currentPartyValue + newCost <= getRunValueLimit()
-      && this.partyStarterIds.length < PLAYER_PARTY_MAX_SIZE
+      && this.partyStarterIds.length < getStarterPickLimit()
     ) {
       options.push({
         label: i18next.t("starterSelectUiHandler:addToParty"),
@@ -2092,6 +2119,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   public override processInput(button: Button): boolean {
     if (this.blockInput) {
       return false;
+    }
+    if (this.coopUi?.processInput(button)) {
+      return true;
     }
 
     const ui = this.getUi();
@@ -3022,6 +3052,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     starter.label.setText(valueStr);
     let textStyle: TextStyle;
     switch (baseStarterValue - starterValue) {
+      case -2:
+      case -1:
+        textStyle = TextStyle.SUMMARY_RED;
+        break;
       case 0:
         textStyle = TextStyle.WINDOW;
         break;
@@ -3142,6 +3176,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         globalScene.money = globalScene.gameMode.getStartingMoney();
         const starters = this.partyStarters.slice(0);
         ui.setMode(UiMode.STARTER_SELECT);
+        if (this.coopUi?.confirm(starters)) {
+          this.clearText();
+          return;
+        }
         const originalStarterSelectCallback = this.starterSelectCallback;
         this.starterSelectCallback = null;
         originalStarterSelectCallback?.(starters);
@@ -3270,6 +3308,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     this.starterSelectContainer.setVisible(false);
     this.blockInput = false;
+    this.coopUi?.destroy();
+    this.coopUi = null;
 
     while (this.partyStarterIds.length > 0) {
       this.popPartyStarter(this.partyStarterIds.length - 1);

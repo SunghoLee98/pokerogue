@@ -3,6 +3,14 @@ import { audioManager } from "#app/global-audio-manager";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
+import { coopCreditsLocalAccount } from "#coop/coop-account";
+import { isCoopBallUnavailable } from "#coop/coop-ball";
+import {
+  beginCoopCaptureDecision,
+  getCaptureSimData,
+  isCaptureRosterFull,
+  registerCoopCapture,
+} from "#coop/coop-capture";
 import { SubstituteTag } from "#data/battler-tags";
 import { Gender } from "#data/gender";
 import {
@@ -34,13 +42,16 @@ import i18next from "i18next";
 export class AttemptCapturePhase extends PokemonPhase {
   public readonly phaseName = "AttemptCapturePhase";
   private readonly pokeballType: PokeballType;
+  /** The `id` of the player pokemon that threw the ball, if known */
+  private readonly throwerId: number | undefined;
   private pokeball: Phaser.GameObjects.Sprite;
   private originalY: number;
 
-  constructor(targetIndex: number, pokeballType: PokeballType) {
+  constructor(targetIndex: number, pokeballType: PokeballType, throwerId?: number) {
     super(BattlerIndex.ENEMY + targetIndex);
 
     this.pokeballType = pokeballType;
+    this.throwerId = throwerId;
   }
 
   start() {
@@ -48,7 +59,7 @@ export class AttemptCapturePhase extends PokemonPhase {
 
     const pokemon = this.getPokemon() as EnemyPokemon;
 
-    if (!pokemon?.hp) {
+    if (!pokemon?.hp || isCoopBallUnavailable(this.pokeballType)) {
       return this.end();
     }
 
@@ -71,7 +82,7 @@ export class AttemptCapturePhase extends PokemonPhase {
       (((_3m - _2h) * catchRate * pokeballMultiplier) / _3m) * statusMultiplier * shinyMultiplier,
     );
     const shakeProbability = Math.round(65536 / Math.pow(255 / modifiedCatchRate, 0.1875)); // Formula taken from gen 6
-    const criticalCaptureChance = getCriticalCaptureChance(modifiedCatchRate);
+    const criticalCaptureChance = getCriticalCaptureChance(modifiedCatchRate, getCaptureSimData(this.throwerId));
 
     if ((isBeta || isDev) && !IS_TEST) {
       console.log(
@@ -244,6 +255,7 @@ export class AttemptCapturePhase extends PokemonPhase {
   catch() {
     const { gameData, phaseManager, pokemonInfoContainer, ui } = globalScene;
     const pokemon = this.getPokemon() as EnemyPokemon;
+    registerCoopCapture(pokemon, this.throwerId);
 
     const speciesForm = pokemon.fusionSpecies ? pokemon.getFusionSpeciesForm() : pokemon.getSpeciesForm();
 
@@ -269,7 +281,9 @@ export class AttemptCapturePhase extends PokemonPhase {
 
     pokemonInfoContainer.show(pokemon, true);
 
-    gameData.updateSpeciesDexIvs(pokemon.species.getRootSpeciesId(true), pokemon.ivs);
+    if (coopCreditsLocalAccount(pokemon)) {
+      gameData.updateSpeciesDexIvs(pokemon.species.getRootSpeciesId(true), pokemon.ivs);
+    }
 
     const addStatus = new BooleanHolder(true);
     applyChallenges(ChallengeType.POKEMON_ADD_TO_PARTY, pokemon, addStatus);
@@ -295,6 +309,7 @@ export class AttemptCapturePhase extends PokemonPhase {
         };
         const addToParty = (slotIndex?: number) => {
           const newPokemon = pokemon.addToParty(this.pokeballType, slotIndex);
+          registerCoopCapture(newPokemon, this.throwerId);
           const modifiers = globalScene.findModifiers(m => m instanceof PokemonHeldItemModifier, false);
           if (globalScene.getPlayerParty().filter(p => p.isShiny()).length === PLAYER_PARTY_MAX_SIZE) {
             globalScene.validateAchv(achvs.SHINY_PARTY);
@@ -316,7 +331,8 @@ export class AttemptCapturePhase extends PokemonPhase {
             end();
             return;
           }
-          if (globalScene.getPlayerParty().length === PLAYER_PARTY_MAX_SIZE) {
+          if (isCaptureRosterFull(this.throwerId)) {
+            const coopDecision = beginCoopCaptureDecision(this.throwerId);
             const addToPartyMenuConfig: OptionSelectModeConfig = {
               options: [
                 {
@@ -372,6 +388,7 @@ export class AttemptCapturePhase extends PokemonPhase {
                       (slotIndex: number, _option: PartyOption) => {
                         ui.setMode(UiMode.MESSAGE).then(() => {
                           if (slotIndex < PLAYER_PARTY_MAX_SIZE) {
+                            coopDecision?.replaced(slotIndex);
                             addToParty(slotIndex);
                           } else {
                             promptRelease();
@@ -386,6 +403,7 @@ export class AttemptCapturePhase extends PokemonPhase {
                   label: i18next.t("menu:no"),
                   handler: () => {
                     ui.setMode(UiMode.MESSAGE).then(() => {
+                      coopDecision?.keptOut();
                       removePokemon();
                       end();
                     });
@@ -403,7 +421,13 @@ export class AttemptCapturePhase extends PokemonPhase {
                 ui.setMode(UiMode.OPTION_SELECT, addToPartyMenuConfig);
               });
             };
-            promptRelease();
+            const keepOut = () => {
+              removePokemon();
+              end();
+            };
+            if (!coopDecision?.awaitThrower({ replace: addToParty, keepOut })) {
+              promptRelease();
+            }
           } else {
             addToParty();
           }

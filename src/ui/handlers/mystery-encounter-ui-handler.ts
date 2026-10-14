@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { coopEncounterOptionsShown } from "#coop/coop-encounter";
 import { getPokeballAtlasKey } from "#data/pokeball";
 import { Button } from "#enums/buttons";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
@@ -115,6 +116,7 @@ export class MysteryEncounterUiHandler extends UiHandler {
       }, 1000);
     }
     this.displayOptionTooltip();
+    coopEncounterOptionsShown(this);
 
     return true;
   }

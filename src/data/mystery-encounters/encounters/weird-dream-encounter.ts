@@ -2,6 +2,7 @@ import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { coopCreditsLocalAccount, inheritCoopOwner } from "#coop/coop-account";
 import { modifierTypes } from "#data/data-lists";
 import { getLevelTotalExp } from "#data/exp";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -456,6 +457,7 @@ function getTeamTransformations(): PokemonTransformation[] {
     );
 
     transformation.newPokemon.teraType = randSeedInt(MAX_POKEMON_TYPE);
+    inheritCoopOwner(transformation.previousPokemon, transformation.newPokemon);
   }
 
   return pokemonTransformations;
@@ -587,7 +589,9 @@ async function postProcessTransformedPokemon(
       globalScene.validateAchv(achvs.CATCH_MYTHICAL);
     }
 
-    globalScene.gameData.updateSpeciesDexIvs(newPokemon.species.getRootSpeciesId(true), newPokemon.ivs);
+    if (coopCreditsLocalAccount(newPokemon)) {
+      globalScene.gameData.updateSpeciesDexIvs(newPokemon.species.getRootSpeciesId(true), newPokemon.ivs);
+    }
     const newStarterUnlocked = await globalScene.gameData.setPokemonCaught(newPokemon, true, false, false);
     if (newStarterUnlocked) {
       isNewStarter = true;
@@ -611,7 +615,7 @@ async function postProcessTransformedPokemon(
   });
 
   // For pokemon that the player owns (including ones just caught), gain a candy
-  if (!forBattle && globalScene.gameData.dexData[speciesRootForm].caughtAttr) {
+  if (!forBattle && globalScene.gameData.dexData[speciesRootForm].caughtAttr && coopCreditsLocalAccount(newPokemon)) {
     globalScene.gameData.addStarterCandy(speciesRootForm, 1);
   }
 
@@ -809,7 +813,12 @@ async function addEggMoveToNewPokemonMoveset(
       }
 
       // For pokemon that the player owns (including ones just caught), unlock the egg move
-      if (!forBattle && randomEggMoveIndex != null && globalScene.gameData.dexData[speciesRootForm].caughtAttr) {
+      if (
+        !forBattle
+        && randomEggMoveIndex != null
+        && globalScene.gameData.dexData[speciesRootForm].caughtAttr
+        && coopCreditsLocalAccount(newPokemon)
+      ) {
         await globalScene.gameData.setEggMoveUnlocked(
           speciesDataRegistry.getSpecies(speciesRootForm),
           randomEggMoveIndex,

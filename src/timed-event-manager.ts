@@ -3,6 +3,7 @@ import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { SHINY_CATCH_RATE_MULTIPLIER } from "#balance/rates";
 import { CLASSIC_CANDY_FRIENDSHIP_MULTIPLIER } from "#balance/starters";
 import { timedEvents } from "#balance/timed-events";
+import { getCoopTimedEvent } from "#coop/coop-session";
 import type { PokemonSpeciesFilter } from "#data/pokemon-species";
 import type { BiomeId } from "#enums/biome-id";
 import type { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -26,6 +27,10 @@ export class TimedEventManager {
   isActive(event: TimedEvent) {
     if (this.disabled) {
       return false;
+    }
+    const coopEvent = getCoopTimedEvent();
+    if (coopEvent !== undefined) {
+      return event.name === coopEvent;
     }
     const now = new Date();
     return event.startDate < now && now < event.endDate;

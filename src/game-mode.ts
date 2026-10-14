@@ -36,6 +36,8 @@ interface GameModeConfig {
   isSplicedOnly?: boolean;
   isChallenge?: boolean;
   hasMysteryEncounters?: boolean;
+  /** Two-player co-op on top of classic; there is no separate `GameModes` entry for it */
+  isCoop?: boolean;
 }
 
 export class GameMode implements GameModeConfig {
@@ -56,6 +58,7 @@ export class GameMode implements GameModeConfig {
   public hasMysteryEncounters: boolean;
   public minMysteryEncounterWave: number;
   public maxMysteryEncounterWave: number;
+  public isCoop = false;
 
   constructor(modeId: GameModes, config: GameModeConfig, battleConfig?: FixedBattleConfigs) {
     this.modeId = modeId;

@@ -13,6 +13,8 @@ import { Tutorial } from "#app/tutorial";
 import { speciesEggMoves } from "#balance/egg-moves";
 import { bypassLogin, isBeta, isDev, systemSaveShortKeyMap } from "#constants/app-constants";
 import { MAX_STARTER_CANDY_COUNT } from "#constants/game-constants";
+import { recordCoopPartnerCatch } from "#coop/coop-account";
+import { getCoopSaveFields, rememberCoopWaveStart, saveCoopGuestData } from "#coop/coop-save";
 import { EntryHazardTag } from "#data/arena-tag";
 import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed-utils";
 import { allMoves } from "#data/data-lists";
@@ -782,6 +784,7 @@ export class GameData {
       mysteryEncounterType: globalScene.currentBattle.mysteryEncounter?.encounterType ?? -1,
       mysteryEncounterSaveData: globalScene.mysteryEncounterSaveData,
       playerFaints: globalScene.arena.playerFaints,
+      ...getCoopSaveFields(),
     } as SessionSaveData;
   }
 
@@ -1193,6 +1196,10 @@ export class GameData {
     useCachedSession = false,
     useCachedSystem = false,
   ): Promise<boolean> {
+    const coopGuestSave = saveCoopGuestData(this, sync, useCachedSession);
+    if (coopGuestSave) {
+      return coopGuestSave;
+    }
     if (!skipVerification) {
       const [success] = await updateUserInfo();
       if (!success) {
@@ -1205,6 +1212,9 @@ export class GameData {
           decrypt(localStorage.getItem(getSessionDataLocalStorageKey(globalScene.sessionSlotId))!, bypassLogin),
         ) // TODO: is this bang correct?
       : this.getSessionSaveData();
+    if (!useCachedSession) {
+      rememberCoopWaveStart(sessionData);
+    }
 
     const maxIntAttrValue = 0x80000000;
 
@@ -1607,6 +1617,10 @@ export class GameData {
     fromEgg = false,
     showMessage = true,
   ): Promise<boolean> {
+    const coopPartnerCatch = recordCoopPartnerCatch(this, pokemon);
+    if (coopPartnerCatch) {
+      return coopPartnerCatch;
+    }
     // If incrementCount === false (not a catch scenario), only update the pokemon's dex data if the Pokemon has already been marked as caught in dex
     // Prevents form changes, nature changes, etc. from unintentionally updating the dex data of a "rental" pokemon
     const speciesRootForm = pokemon.species.getRootSpeciesId();

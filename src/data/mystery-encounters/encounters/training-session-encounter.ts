@@ -2,6 +2,7 @@ import type { Ability } from "#abilities/ability";
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { coopCreditsLocalAccount } from "#coop/coop-account";
 import { allAbilities } from "#data/data-lists";
 import { getNatureName } from "#data/nature";
 import { AbilityAttr } from "#enums/ability-attr";
@@ -151,7 +152,9 @@ export const TrainingSessionEncounter: MysteryEncounter = MysteryEncounterBuilde
 
           if (improvedCount > 0) {
             playerPokemon.calculateStats();
-            globalScene.gameData.updateSpeciesDexIvs(playerPokemon.species.getRootSpeciesId(true), playerPokemon.ivs);
+            if (coopCreditsLocalAccount(playerPokemon)) {
+              globalScene.gameData.updateSpeciesDexIvs(playerPokemon.species.getRootSpeciesId(true), playerPokemon.ivs);
+            }
             globalScene.gameData.setPokemonCaught(playerPokemon, false);
           }
 
@@ -231,7 +234,9 @@ export const TrainingSessionEncounter: MysteryEncounter = MysteryEncounterBuilde
           queueEncounterMessage(`${namespace}:option.2.finished`);
           // Add the pokemon back to party with Nature change
           playerPokemon.setCustomNature(encounter.misc.chosenNature);
-          globalScene.gameData.unlockSpeciesNature(playerPokemon.species, encounter.misc.chosenNature);
+          if (coopCreditsLocalAccount(playerPokemon)) {
+            globalScene.gameData.unlockSpeciesNature(playerPokemon.species, encounter.misc.chosenNature);
+          }
 
           // Add pokemon and modifiers back
           globalScene.getPlayerParty().push(playerPokemon);
@@ -335,6 +340,7 @@ export const TrainingSessionEncounter: MysteryEncounter = MysteryEncounterBuilde
               rootFusionSpecies != null
               && speciesDataRegistry.isStarter(rootFusionSpecies)
               && globalScene.gameData.dexData[rootFusionSpecies].caughtAttr
+              && coopCreditsLocalAccount(playerPokemon)
             ) {
               globalScene.gameData.starterData[rootFusionSpecies].abilityAttr |=
                 playerPokemon.fusionAbilityIndex !== 1 || playerPokemon.fusionSpecies?.ability2

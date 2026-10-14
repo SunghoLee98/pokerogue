@@ -1,6 +1,8 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { coopExcludesLures } from "#coop/coop-reward";
+import { getWorldSimData } from "#coop/coop-sim-data";
 import { modifierTypes } from "#data/data-lists";
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
 import { AbilityId } from "#enums/ability-id";
@@ -362,8 +364,11 @@ function initUltraModifierPool() {
     ),
     new WeightedModifierType(modifierTypes.AMULET_COIN, skipInLastClassicWaveOrDefault(3)),
     new WeightedModifierType(modifierTypes.EVIOLITE, (party: Pokemon[]) => {
-      const { gameMode, gameData } = globalScene;
-      if (gameMode.isDaily || (!gameMode.isFreshStartChallenge() && gameData.isUnlocked(Unlockables.EVIOLITE))) {
+      const { gameMode } = globalScene;
+      if (
+        gameMode.isDaily
+        || (!gameMode.isFreshStartChallenge() && getWorldSimData().isUnlocked(Unlockables.EVIOLITE))
+      ) {
         return party.some(p => {
           // Check if Pokemon's species (or fusion species, if applicable) can evolve or if they're G-Max'd
           if (
@@ -641,8 +646,7 @@ function initMasterModifierPool() {
       modifierTypes.MINI_BLACK_HOLE,
       () =>
         globalScene.gameMode.isDaily
-        || (!globalScene.gameMode.isFreshStartChallenge()
-          && globalScene.gameData.isUnlocked(Unlockables.MINI_BLACK_HOLE))
+        || (!globalScene.gameMode.isFreshStartChallenge() && getWorldSimData().isUnlocked(Unlockables.MINI_BLACK_HOLE))
           ? 1
           : 0,
       1,
@@ -839,6 +843,9 @@ function skipInLastClassicWaveOrDefault(defaultWeight: number): WeightedModifier
  */
 function lureWeightFunc(maxBattles: number, weight: number): WeightedModifierTypeWeightFunc {
   return () => {
+    if (coopExcludesLures()) {
+      return 0;
+    }
     const lures = globalScene.getModifiers(DoubleBattleChanceBoosterModifier);
     return !(globalScene.gameMode.isClassic && globalScene.currentBattle.waveIndex === 199)
       && (lures.length === 0
