@@ -11,7 +11,7 @@ RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 
 WORKDIR /app
 
-COPY coop-server/package.json coop-server/pnpm-lock.yaml coop-server/pnpm-workspace.yaml ./
+COPY coop-server/package.json coop-server/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
 COPY coop-server/src ./src
