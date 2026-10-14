@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 # Builds the co-op game from SunghoLee98/pokerogue and publishes it to GitHub Pages
-# (https://sungholee98.github.io/pokerogue-coop/). It lives in a separate, non-fork
+# (https://sungholee98.github.io/pokerogue-coop-cdn/). It lives in a separate, non-fork
 # repository because the upstream project disables Pages on its forks.
-# Copy this file to `.github/workflows/deploy.yml` in SunghoLee98/pokerogue-coop.
+# Copy this file to `.github/workflows/deploy.yml` in SunghoLee98/pokerogue-coop-cdn.
 #
 # One-time setup in that repository: Settings -> Pages -> Source: "GitHub Actions".
 
@@ -55,7 +55,7 @@ jobs:
       - name: Add game assets
         run: |
           cp -r assets/. dist/
-          # The site lives under /pokerogue-coop/, so keep the installed app inside it.
+          # The site lives under /pokerogue-coop-cdn/, so keep the installed app inside it.
           jq '.scope = "./" | .start_url = "./"' dist/manifest.webmanifest > dist/manifest.webmanifest.tmp
           mv dist/manifest.webmanifest.tmp dist/manifest.webmanifest
           echo "Site size: $(du -sh --apparent-size dist | cut -f1), files: $(find dist -type f -not -path '*/.*' | wc -l)"
