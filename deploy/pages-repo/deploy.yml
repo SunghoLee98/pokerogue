@@ -2,40 +2,43 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-only
 
-# Builds the co-op game frontend and publishes it to GitHub Pages
-# (https://sungholee98.github.io/pokerogue/), so players load it from GitHub's CDN.
-# The API server and the co-op relay stay on Railway.
+# Builds the co-op game from SunghoLee98/pokerogue and publishes it to GitHub Pages
+# (https://sungholee98.github.io/pokerogue-coop/). It lives in a separate, non-fork
+# repository because the upstream project disables Pages on its forks.
+# Copy this file to `.github/workflows/deploy.yml` in SunghoLee98/pokerogue-coop.
 #
-# One-time repository setup:
-# - Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
-# - Settings -> Environments -> github-pages -> Deployment branches and tags:
-#   allow `claude/festive-davinci-49n6ht` (or "No restriction").
+# One-time setup in that repository: Settings -> Pages -> Source: "GitHub Actions".
 
 name: Deploy Co-op Pages
 
 on:
   push:
     branches:
-      - claude/festive-davinci-49n6ht
+      - main
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or commit of SunghoLee98/pokerogue to build"
+        default: claude/festive-davinci-49n6ht
+        required: true
 
 permissions:
   contents: read
 
-# Never cancel a running Pages deployment; queue the next one instead.
 concurrency:
   group: coop-pages
   cancel-in-progress: false
 
 jobs:
   build:
-    if: github.repository == 'SunghoLee98/pokerogue'
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      # The assets and locales submodules are checked out at the commits this repo pins.
+      # The assets and locales submodules are checked out at the commits the game pins.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # 7.0.0
         with:
+          repository: SunghoLee98/pokerogue
+          ref: ${{ inputs.ref || 'claude/festive-davinci-49n6ht' }}
           submodules: "recursive"
 
       - uses: ./.github/actions/setup-deps
@@ -52,7 +55,7 @@ jobs:
       - name: Add game assets
         run: |
           cp -r assets/. dist/
-          # The site lives under /pokerogue/, so keep the installed app inside it.
+          # The site lives under /pokerogue-coop/, so keep the installed app inside it.
           jq '.scope = "./" | .start_url = "./"' dist/manifest.webmanifest > dist/manifest.webmanifest.tmp
           mv dist/manifest.webmanifest.tmp dist/manifest.webmanifest
           echo "Site size: $(du -sh --apparent-size dist | cut -f1), files: $(find dist -type f -not -path '*/.*' | wc -l)"
