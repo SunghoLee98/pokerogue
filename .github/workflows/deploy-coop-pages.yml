@@ -1,0 +1,76 @@
+# SPDX-FileCopyrightText: 2026 SunghoLee98
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Builds the co-op game frontend and publishes it to GitHub Pages
+# (https://sungholee98.github.io/pokerogue/), so players load it from GitHub's CDN.
+# The API server and the co-op relay stay on Railway.
+#
+# One-time repository setup:
+# - Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+# - Settings -> Environments -> github-pages -> Deployment branches and tags:
+#   allow `claude/festive-davinci-49n6ht` (or "No restriction").
+
+name: Deploy Co-op Pages
+
+on:
+  push:
+    branches:
+      - claude/festive-davinci-49n6ht
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never cancel a running Pages deployment; queue the next one instead.
+concurrency:
+  group: coop-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'SunghoLee98/pokerogue'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      # The assets and locales submodules are checked out at the commits this repo pins.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # 7.0.0
+        with:
+          submodules: "recursive"
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Build
+        run: pnpm build
+        env:
+          NODE_ENV: production
+          VITE_SERVER_URL: https://rogueserver-production-bfb7.up.railway.app
+          VITE_COOP_RELAY_URL: wss://coop-relay-production-829b.up.railway.app
+          VITE_BYPASS_LOGIN: "0"
+          VITE_BYPASS_TUTORIAL: "0"
+
+      - name: Add game assets
+        run: |
+          cp -r assets/. dist/
+          # The site lives under /pokerogue/, so keep the installed app inside it.
+          jq '.scope = "./" | .start_url = "./"' dist/manifest.webmanifest > dist/manifest.webmanifest.tmp
+          mv dist/manifest.webmanifest.tmp dist/manifest.webmanifest
+          echo "Site size: $(du -sh --apparent-size dist | cut -f1), files: $(find dist -type f -not -path '*/.*' | wc -l)"
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
