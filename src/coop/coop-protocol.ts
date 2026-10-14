@@ -147,7 +147,8 @@ type CoopMessageBody =
       resume?: boolean;
     }
   /**
-   * A player's starter selection. `picks` is only filled while `ready` (only confirmed picks are shown to the peer).
+   * A player's starter selection, sent whenever their party or ready changes: `picks` is the party (confirmed while
+   * `ready`) and `cost` its starter points, counted on the sender's account.
    * `account` is the sender's account snapshot, read for their pokemon once the run starts.
    */
   | { t: "starters"; picks: CoopStarterPayload[]; ready: boolean; cost: number; account: CoopAccountSnapshot }

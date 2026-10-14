@@ -123,7 +123,11 @@ describe("CoopStarterSelectController", () => {
     expect(controller.processInput(Button.CANCEL)).toBe(true);
     await flush();
 
-    expect(partner.partner).toEqual({ picks: [], ready: false, cost: 0 });
+    expect(partner.partner).toEqual({
+      picks: [createTestStarterPayload(SpeciesId.CHARMANDER)],
+      ready: false,
+      cost: 3,
+    });
     expect(controller.processInput(Button.CANCEL)).toBe(false);
   });
 
@@ -174,17 +178,49 @@ describe("CoopStarterSelectController", () => {
     expect(local.startInfo).not.toBeNull();
   });
 
-  it("gives the points back when the partner unreadies", async () => {
-    const { partner, view, controller, limitChanges } = await setUp();
-    partner.setReady([createTestStarterPayload(SpeciesId.MEWTWO)], { cost: 7, limit: 10 });
+  it("shares the party as it changes, not while it stays the same", async () => {
+    const { partner, controller } = await setUp();
+    const sent = vi.fn();
+    partner.onChange(sent);
+    controller.updatePicks([starter(SpeciesId.CHARMANDER)]);
     await flush();
+    expect(partner.partner).toEqual({
+      picks: [createTestStarterPayload(SpeciesId.CHARMANDER)],
+      ready: false,
+      cost: 3,
+    });
+
+    controller.updatePicks([starter(SpeciesId.CHARMANDER)]);
+    await flush();
+    expect(sent).toHaveBeenCalledTimes(1);
+
+    controller.updatePicks([]);
+    await flush();
+    expect(partner.partner).toEqual({ picks: [], ready: false, cost: 0 });
+  });
+
+  it("gives the points back when the partner empties their party", async () => {
+    const { partner, view, controller, limitChanges } = await setUp();
+    partner.setPicks([createTestStarterPayload(SpeciesId.MEWTWO)], { cost: 7, limit: 10 });
+    await flush();
+    expect(controller.valueLimit).toBe(3);
     controller.confirm([starter(SpeciesId.CHARMANDER), starter(SpeciesId.SQUIRTLE)]);
-    partner.cancelReady();
+    partner.setPicks([], { cost: 0, limit: 10 });
     await flush();
 
     expect(controller.valueLimit).toBe(10);
     expect(limitChanges()).toBe(2);
     expect(view.status).toBe(coopText("partnerPicking"));
+  });
+
+  it("refuses a ready over the points the partner's unready party left", async () => {
+    const { local, partner, view, controller } = await setUp();
+    partner.setPicks([createTestStarterPayload(SpeciesId.MEWTWO)], { cost: 7, limit: 10 });
+    await flush();
+
+    controller.confirm([starter(SpeciesId.CHARMANDER), starter(SpeciesId.SQUIRTLE)]);
+    expect(local.localReady).toBe(false);
+    expect(view.status).toBe(coopText("notEnoughPoints"));
   });
 
   it("tells the guest when the host took the points first", async () => {

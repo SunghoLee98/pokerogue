@@ -74,11 +74,22 @@ describe("CoopStarterSelection", () => {
     return starts;
   }
 
-  it("sends picks only when ready", async () => {
+  it("shares the party before ready", async () => {
     const { host, guest } = await connect();
     await flush();
     expect(host.partner).toEqual({ picks: [], ready: false, cost: 0 });
 
+    guest.setPicks([pick(SpeciesId.CHARMANDER)], { cost: 3, limit: 10 });
+    await flush();
+    expect(host.partner).toEqual({ picks: [pick(SpeciesId.CHARMANDER)], ready: false, cost: 3 });
+
+    guest.setPicks([], { cost: 0, limit: 10 });
+    await flush();
+    expect(host.partner).toEqual({ picks: [], ready: false, cost: 0 });
+  });
+
+  it("confirms the picks on ready", async () => {
+    const { host, guest } = await connect();
     guest.setReady([pick(SpeciesId.CHARMANDER)], FREE_POINTS);
     await flush();
 
@@ -86,16 +97,25 @@ describe("CoopStarterSelection", () => {
     expect(guest.localReady).toBe(true);
   });
 
-  it("clears the partner picks on unready", async () => {
+  it("keeps the partner picks on unready", async () => {
     const { host, guest } = await connect();
-    guest.setReady([pick(SpeciesId.CHARMANDER)], FREE_POINTS);
+    guest.setReady([pick(SpeciesId.CHARMANDER)], { cost: 3, limit: 10 });
     await flush();
 
     expect(guest.cancelReady()).toBe(true);
     await flush();
 
     expect(guest.localReady).toBe(false);
-    expect(host.partner).toEqual({ picks: [], ready: false, cost: 0 });
+    expect(host.partner).toEqual({ picks: [pick(SpeciesId.CHARMANDER)], ready: false, cost: 3 });
+  });
+
+  it("ignores party changes while ready", async () => {
+    const { host, guest } = await connect();
+    guest.setReady([pick(SpeciesId.CHARMANDER)], { cost: 3, limit: 10 });
+    guest.setPicks([], { cost: 0, limit: 10 });
+    await flush();
+
+    expect(host.partner).toEqual({ picks: [pick(SpeciesId.CHARMANDER)], ready: true, cost: 3 });
   });
 
   it("notifies changes", async () => {
@@ -186,14 +206,17 @@ describe("CoopStarterSelection", () => {
     expect(guest.startInfo?.picks).toEqual({ host: [pick(SpeciesId.MEWTWO)], guest: [pick(SpeciesId.CHARMANDER)] });
   });
 
-  it("gives the points back on unready", async () => {
+  it("takes the partner's party out of the budget before ready", async () => {
     const { host, guest } = await connect();
-    host.setReady([pick(SpeciesId.MEWTWO)], { cost: 7, limit: 10 });
-    await flush();
-    host.cancelReady();
+    host.setPicks([pick(SpeciesId.MEWTWO)], { cost: 7, limit: 10 });
     await flush();
 
-    expect(guest.partner.cost).toBe(0);
+    expect(() => guest.setReady([pick(SpeciesId.CHARMANDER)], { cost: 4, limit: 10 })).toThrow();
+
+    host.setPicks([], { cost: 0, limit: 10 });
+    await flush();
+    guest.setReady([pick(SpeciesId.CHARMANDER)], { cost: 4, limit: 10 });
+    expect(guest.localReady).toBe(true);
   });
 
   it("makes the guest give way when both ready over the budget at once", async () => {
@@ -208,7 +231,7 @@ describe("CoopStarterSelection", () => {
     expect(guest.localReady).toBe(false);
     expect(guest.readyYielded).toBe(true);
     expect(host.localReady).toBe(true);
-    expect(host.partner).toEqual({ picks: [], ready: false, cost: 0 });
+    expect(host.partner).toEqual({ picks: [pick(SpeciesId.RAYQUAZA)], ready: false, cost: 6 });
 
     guest.setReady([pick(SpeciesId.CHARMANDER)], { cost: 4, limit: 10 });
     expect(guest.readyYielded).toBe(false);

@@ -1,10 +1,11 @@
 /**
  * The co-op starter selection handshake.
  *
- * Each player picks on their own screen. Pressing start makes a player ready and sends their confirmed picks;
- * the peer only ever sees confirmed picks. A ready player may take it back while the partner is still picking.
- * Both players share one starter point budget: a ready player's picks take their cost out of it, so the other
- * player picks with what is left. If both become ready at once and their picks cost more than the budget together,
+ * Each player picks on their own screen. The pokemon a player puts in their party are shared as they change
+ * (the cursor is not), and pressing start makes the player ready with them. A ready player may take it back while
+ * the partner is still picking.
+ * Both players share one starter point budget: a player's party takes its cost out of it, so the other player picks
+ * with what is left. If both become ready at once and their parties cost more than the budget together,
  * the guest gives way: its ready is taken back and it picks again.
  * When both are ready the host decides the run: it sends `start` with the shared seed, both account snapshots,
  * both players' picks and its active timed event, and both clients start from that one message.
@@ -27,14 +28,14 @@ export interface CoopStartInfo {
 }
 
 export interface CoopPartnerSelection {
-  /** The partner's confirmed picks; empty while they are not ready */
+  /** The pokemon in the partner's party, confirmed once they are ready */
   readonly picks: readonly CoopStarterPayload[];
   readonly ready: boolean;
-  /** The starter points the partner's confirmed picks take from the shared budget; `0` while they are not ready */
+  /** The starter points the partner's party takes from the shared budget */
   readonly cost: number;
 }
 
-/** The starter points of a ready: what the picks cost and the budget both players share. */
+/** The starter points of a party: what the picks cost and the budget both players share. */
 export interface CoopStarterPoints {
   /** What the picks cost on the picking player's account */
   cost: number;
@@ -112,6 +113,20 @@ export class CoopStarterSelection {
   }
 
   /**
+   * Share the pokemon now in the local party, before ready.
+   * Ignored while ready (the party cannot change then) or once the selection has started or closed.
+   * @param points - What the picks cost and the shared budget
+   */
+  setPicks(picks: CoopStarterPayload[], points: CoopStarterPoints): void {
+    if (this.ready || this.started || this.isClosed) {
+      return;
+    }
+    this.localPicks = [...picks];
+    this.localPoints = { ...points };
+    this.sendSelection();
+  }
+
+  /**
    * Confirm the local picks and become ready.
    * @param points - What the picks cost and the shared budget
    * @throws If there are no picks or more than {@linkcode COOP_MAX_OWNED}, if the picks cost more than the partner
@@ -137,7 +152,7 @@ export class CoopStarterSelection {
   }
 
   /**
-   * Take back the ready state to pick again.
+   * Take back the ready state to pick again. The picks stay shared as the party the player keeps picking from.
    * @returns `false` if the run has already started (the host's start wins)
    */
   cancelReady(): boolean {
@@ -171,7 +186,6 @@ export class CoopStarterSelection {
   private unready(): void {
     if (this.ready) {
       this.ready = false;
-      this.localPicks = [];
       this.sendSelection();
     }
   }
@@ -184,9 +198,9 @@ export class CoopStarterSelection {
   private sendSelection(): void {
     this.transport.send({
       t: "starters",
-      picks: this.ready ? this.localPicks : [],
+      picks: this.localPicks,
       ready: this.ready,
-      cost: this.ready ? this.localPoints.cost : 0,
+      cost: this.localPoints.cost,
       account: this.localAccount ?? this.options.getAccount(),
     });
   }
@@ -217,8 +231,8 @@ export class CoopStarterSelection {
 
   private handlePartnerSelection(message: StartersMessage): void {
     this.partnerReady = message.ready;
-    this.partnerPicks = message.ready ? message.picks : [];
-    this.partnerCost = message.ready ? message.cost : 0;
+    this.partnerPicks = message.picks;
+    this.partnerCost = message.cost;
     this.partnerAccount = message.account;
     // Both readied at once over the budget: the host's ready stands, the guest picks again with what is left.
     if (this.role === "guest" && this.overBudget()) {

@@ -651,7 +651,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     );
   }
 
-  /** The starter point limit for the party: in co-op, what the partner's ready picks left of the shared budget. */
+  /** The starter point limit for the party: in co-op, what the partner's party left of the shared budget. */
   private getValueLimit(): number {
     return this.coopUi?.valueLimit ?? getRunValueLimit();
   }
@@ -2270,6 +2270,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     this.partyStarters.push(starter);
     this.partyStarterIds.push(starterId);
+    this.coopUi?.updatePicks(this.partyStarters);
     speciesDataRegistry.getPokemonSpeciesForm(species.speciesId, props.formIndex).cry();
     this.updateInstructions();
   }
@@ -2851,6 +2852,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       starter.abilityIndex = abilityIndex;
       starter.nature = natureIndex;
       starter.teraType = teraType;
+      this.coopUi?.updatePicks(this.partyStarters);
     }
 
     const currentContainer = this.starterContainers.find(p => p.species.speciesId === starterId);
@@ -2995,6 +2997,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private popPartyStarter(index: number): void {
     this.partyStarterIds.splice(index, 1);
     this.partyStarters.splice(index, 1);
+    this.coopUi?.updatePicks(this.partyStarters);
 
     for (let s = 0; s < this.partyStarterIds.length; s++) {
       const starterId = this.partyStarterIds[s];

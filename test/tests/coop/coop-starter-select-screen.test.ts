@@ -1,12 +1,16 @@
 import { leaveCoop, openCoopLobby } from "#coop/coop-lobby";
 import { createLoopbackPair } from "#coop/loopback-transport";
 import { Button } from "#enums/buttons";
+import { DexAttr } from "#enums/dex-attr";
+import { MoveId } from "#enums/move-id";
 import { Nature } from "#enums/nature";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import { createTestStarterPayload } from "#test/utils/coop-replay";
 import type { Starter } from "#types/save-data";
+import type { StarterSpeciesId } from "#types/starter-species-id";
 import type { ConfirmModeConfig } from "#types/ui-types";
 import type { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
 import Phaser from "phaser";
@@ -86,6 +90,34 @@ describe("co-op on the starter select screen", () => {
   }
 
   const messageBoxVisible = () => handler["starterSelectMessageBoxContainer"].visible;
+
+  it("shares the party with the partner as it changes", async () => {
+    const { pair } = await setUp();
+    const received: unknown[] = [];
+    pair.host.onMessage(message => received.push(message));
+    // Set when the screen is shown and the cursor moves, which cannot happen headless
+    handler["starterPreferences"] = {};
+    handler["lastStarterId"] = SpeciesId.SQUIRTLE as StarterSpeciesId;
+
+    handler["addToParty"](
+      SpeciesId.SQUIRTLE as StarterSpeciesId,
+      DexAttr.MALE | DexAttr.NON_SHINY | DexAttr.DEFAULT_VARIANT | DexAttr.DEFAULT_FORM,
+      0,
+      Nature.HARDY,
+      [MoveId.TACKLE, MoveId.TAIL_WHIP, MoveId.WATER_GUN, MoveId.WITHDRAW],
+      PokemonType.WATER,
+    );
+    await flush();
+    expect(received.at(-1)).toMatchObject({
+      t: "starters",
+      ready: false,
+      picks: [{ speciesId: SpeciesId.CHARMANDER }, { speciesId: SpeciesId.SQUIRTLE }],
+    });
+
+    handler["popPartyStarter"](0);
+    await flush();
+    expect(received.at(-1)).toMatchObject({ t: "starters", ready: false, picks: [{ speciesId: SpeciesId.SQUIRTLE }] });
+  });
 
   it("closes the start prompt once the player is ready", async () => {
     const { lobby, confirms } = await setUp();

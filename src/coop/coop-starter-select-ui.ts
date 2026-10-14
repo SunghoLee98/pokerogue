@@ -1,7 +1,7 @@
 /**
  * Co-op on the starter select screen: pressing start makes the player ready instead of starting the run,
- * cancel takes the ready back, and the partner's confirmed picks are shown beside the player's own.
- * Both players share the solo starter point budget, so the player's limit is what the partner's ready picks left.
+ * cancel takes the ready back, and the partner's party is shown beside the player's own as it changes.
+ * Both players share the solo starter point budget, so the player's limit is what the partner's party left.
  * @module
  */
 
@@ -23,7 +23,7 @@ import { addTextObject } from "#ui/text";
 
 /** Where the partner's picks and the co-op status are drawn. */
 export interface CoopPartnerView {
-  /** Show the partner's confirmed picks (empty while they are still picking). */
+  /** Show the pokemon in the partner's party (confirmed once they are ready). */
   setPartner(picks: readonly CoopStarterPayload[], ready: boolean): void;
   setStatus(text: string): void;
   destroy(): void;
@@ -36,7 +36,7 @@ export interface CoopStarterSelectOptions {
   getSharedLimit?(): number;
   /** What the starters cost on the local account. Default: {@linkcode getPartyValue} */
   getCost?(starters: readonly Starter[]): number;
-  /** Called when the partner's ready changes the local player's point limit */
+  /** Called when the partner's party changes the local player's point limit */
   onLimitChange?(): void;
 }
 
@@ -54,6 +54,8 @@ export class CoopStarterSelectController {
   private lastPartnerCost = 0;
   /** Whether the last confirm was refused because the starters cost more than the points left */
   private overLimit = false;
+  /** The last party shared with the partner, to send only changes */
+  private sharedPicks = "[]";
 
   /**
    * @param onStart - Called once when the run starts, with the local player's starters
@@ -78,9 +80,26 @@ export class CoopStarterSelectController {
     this.render();
   }
 
-  /** The local player's starter point limit: what the partner's ready picks left of the shared budget. */
+  /** The local player's starter point limit: what the partner's party left of the shared budget. */
   get valueLimit(): number {
     return this.getSharedLimit() - this.selection.partner.cost;
+  }
+
+  /**
+   * The player's party changed: share it with the partner, who sees the pokemon and has their points taken.
+   * Only changes are sent, so moving the cursor over a party member does not show.
+   */
+  updatePicks(starters: readonly Starter[]): void {
+    if (this.selection.localReady || this.selection.startInfo || this.selection.closed) {
+      return;
+    }
+    const picks = starters.map(starter => this.buildPayload(starter));
+    const shared = JSON.stringify(picks);
+    if (shared === this.sharedPicks) {
+      return;
+    }
+    this.sharedPicks = shared;
+    this.selection.setPicks(picks, { cost: this.getCost(starters), limit: this.getSharedLimit() });
   }
 
   /**
@@ -143,7 +162,7 @@ export class CoopStarterSelectController {
     } else if (this.selection.localReady) {
       this.overLimit = false;
       this.view.setStatus(coopText("waitingForReady"));
-    } else if (partner.ready && (this.selection.readyYielded || this.overLimit)) {
+    } else if (this.selection.readyYielded || this.overLimit) {
       this.view.setStatus(coopText("notEnoughPoints"));
     } else {
       this.view.setStatus(coopText(partner.ready ? "partnerReady" : "partnerPicking"));
@@ -185,7 +204,8 @@ class PhaserCoopPartnerView implements CoopPartnerView {
     container.addAt([...this.icons, this.status], container.getIndex(layout.drawBelow));
   }
 
-  setPartner(picks: readonly CoopStarterPayload[]): void {
+  /** The partner's party is drawn faded until they are ready. */
+  setPartner(picks: readonly CoopStarterPayload[], ready: boolean): void {
     for (const [i, icon] of this.icons.entries()) {
       const pick = picks.at(i);
       this.placeholders.at(i)?.setVisible(!pick);
@@ -198,6 +218,7 @@ class PhaserCoopPartnerView implements CoopPartnerView {
       icon
         .setTexture(species.getIconAtlasKey(pick.formIndex, pick.shiny, pick.variant))
         .setFrame(species.getIconId(female, pick.formIndex, pick.shiny, pick.variant))
+        .setAlpha(ready ? 1 : 0.5)
         .setVisible(true);
     }
   }
