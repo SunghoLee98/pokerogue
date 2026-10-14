@@ -20,6 +20,7 @@ ARG ASSETS_REF=9378069914157ea599308ef53ff972459276d3e8
 ARG LOCALES_REF=7c246744e159b3744a817a2811ec7fee74a43590
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN LEFTHOOK=0 pnpm install --frozen-lockfile
 
 COPY . .
