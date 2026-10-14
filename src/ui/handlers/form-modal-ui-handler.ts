@@ -5,6 +5,7 @@ import type { FormModalConfig, ModalConfig } from "#types/ui-types";
 import { ModalUiHandler } from "#ui/modal-ui-handler";
 import { addTextInputObject, addTextObject, getTextColor } from "#ui/text";
 import { addWindow, WindowVariant } from "#ui/ui-theme";
+import { hasTouchscreen } from "#utils/app-utils";
 import { fixedInt, truncateString } from "#utils/common";
 import type Phaser from "phaser";
 import type InputText from "phaser3-rex-plugins/plugins/inputtext";
@@ -119,10 +120,14 @@ export abstract class FormModalUiHandler extends ModalUiHandler {
 
       [this.submitAction, this.cancelAction] = buttonActions;
 
-      // Auto focus the first input field after a short delay, to prevent accidental inputs
-      setTimeout(() => {
-        this.inputs[0]?.setFocus();
-      }, 50);
+      // Auto focus the first input field after a short delay, to prevent accidental inputs.
+      // Not on touch screens: mobile browsers (iOS Safari in particular) give a focus that the player
+      // did not tap neither a caret nor a keyboard, and tapping the already-focused field changes nothing.
+      if (!hasTouchscreen()) {
+        setTimeout(() => {
+          this.inputs[0]?.setFocus();
+        }, 50);
+      }
 
       // Override the pointerDown event for the buttonBgs to call the `submitAction` and `cancelAction`
       // properties that we set above, allowing their behavior to change after this method terminates.
