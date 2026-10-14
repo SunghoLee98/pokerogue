@@ -32,7 +32,7 @@ describe("coop-protocol", () => {
     const messages: CoopMessage[] = [
       { t: "hello", gameVersion: "1.12.1.0", protocol: COOP_PROTOCOL_VERSION, accountName: "a", trainerId: 5 },
       { t: "hello", gameVersion: "1.12.1.0", protocol: 4, accountName: "a", trainerId: 5, resume: true },
-      { t: "starters", picks: [pick], ready: true, account },
+      { t: "starters", picks: [pick], ready: true, cost: 3, account },
       {
         t: "start",
         seed: "seed",
@@ -116,8 +116,8 @@ describe("coop-protocol", () => {
     }
   });
 
-  it("is protocol 5", () => {
-    expect(COOP_PROTOCOL_VERSION).toBe(5);
+  it("is protocol 6", () => {
+    expect(COOP_PROTOCOL_VERSION).toBe(6);
   });
 
   it("returns null for malformed input", () => {

@@ -9,7 +9,6 @@ import {
   getStarterValueFriendshipCap,
   getValueReductionCandyCounts,
 } from "#balance/starters";
-import { applyCoopValueLimit } from "#coop/coop-starter-rules";
 import { AbilityAttr } from "#enums/ability-attr";
 import { CandyUpgradeDisplayMode } from "#enums/candy-upgrade-display-mode";
 import { CandyUpgradeNotificationMode } from "#enums/candy-upgrade-notification-mode";
@@ -449,7 +448,7 @@ export function getRunValueLimit(): number {
 
   applyChallenges(ChallengeType.STARTER_POINTS, valueLimit);
 
-  return applyCoopValueLimit(valueLimit.value);
+  return valueLimit.value;
 }
 
 /**

@@ -617,9 +617,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.setFilterMode(false);
       this.filterBarCursor = 0;
       this.setCursor(0);
-      this.tryUpdateValue(0);
-
       this.setUpCoop();
+      this.tryUpdateValue(0);
 
       handleTutorial(Tutorial.STARTER_SELECT);
 
@@ -639,12 +638,22 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // Above the team column and the starter grid, below the panels, overlays and message box drawn after them
       drawBelow: this.starterSummary,
     };
-    this.coopUi = createCoopStarterSelectUi(this.starterSelectContainer, coopLayout, starters => {
-      this.getUi().setMode(UiMode.STARTER_SELECT);
-      const callback = this.starterSelectCallback;
-      this.starterSelectCallback = null;
-      callback?.(starters);
-    });
+    this.coopUi = createCoopStarterSelectUi(
+      this.starterSelectContainer,
+      coopLayout,
+      starters => {
+        this.getUi().setMode(UiMode.STARTER_SELECT);
+        const callback = this.starterSelectCallback;
+        this.starterSelectCallback = null;
+        callback?.(starters);
+      },
+      () => this.tryUpdateValue(),
+    );
+  }
+
+  /** The starter point limit for the party: in co-op, what the partner's party left of the shared budget. */
+  private getValueLimit(): number {
+    return this.coopUi?.valueLimit ?? getRunValueLimit();
   }
 
   /**
@@ -1110,7 +1119,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             this.isPartyValid(),
           );
           const isCaught = getStarterData(starterId).dexEntry.caughtAttr;
-          return !isDupe && isValidForChallenge && currentPartyValue + starterCost <= getRunValueLimit() && isCaught;
+          return !isDupe && isValidForChallenge && currentPartyValue + starterCost <= this.getValueLimit() && isCaught;
         });
         if (validStarters.length === 0) {
           this.blockInput = false;
@@ -1623,7 +1632,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (
       !isDupe
       && isValidForChallenge
-      && currentPartyValue + newCost <= getRunValueLimit()
+      && currentPartyValue + newCost <= this.getValueLimit()
       && this.partyStarterIds.length < getStarterPickLimit()
     ) {
       options.push({
@@ -2261,6 +2270,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     this.partyStarters.push(starter);
     this.partyStarterIds.push(starterId);
+    this.coopUi?.updatePicks(this.partyStarters);
     speciesDataRegistry.getPokemonSpeciesForm(species.speciesId, props.formIndex).cry();
     this.updateInstructions();
   }
@@ -2842,6 +2852,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       starter.abilityIndex = abilityIndex;
       starter.nature = natureIndex;
       starter.teraType = teraType;
+      this.coopUi?.updatePicks(this.partyStarters);
     }
 
     const currentContainer = this.starterContainers.find(p => p.species.speciesId === starterId);
@@ -2986,6 +2997,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private popPartyStarter(index: number): void {
     this.partyStarterIds.splice(index, 1);
     this.partyStarters.splice(index, 1);
+    this.coopUi?.updatePicks(this.partyStarters);
 
     for (let s = 0; s < this.partyStarterIds.length; s++) {
       const starterId = this.partyStarterIds[s];
@@ -3073,7 +3085,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private tryUpdateValue(add = 0, addingToParty?: boolean): boolean {
     const value = getPartyValue(this.partyStarterIds);
     const newValue = value + add;
-    const valueLimit = getRunValueLimit();
+    const valueLimit = this.getValueLimit();
     const overLimit = newValue > valueLimit;
     let newValueStr: string = newValue.toString();
     if (newValueStr.startsWith("0.")) {

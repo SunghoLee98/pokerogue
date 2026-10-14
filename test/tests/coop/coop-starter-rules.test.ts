@@ -29,11 +29,11 @@ describe("co-op starter rules", () => {
     expect(getGameMode(GameModes.CLASSIC).isCoop).toBe(false);
   });
 
-  it("halves the run value limit in co-op", () => {
+  it("keeps the solo run value limit in co-op, as the budget both players share", () => {
     game.scene.gameMode = getGameMode(GameModes.CLASSIC);
     expect(getRunValueLimit()).toBe(10);
     game.scene.gameMode = createCoopGameMode();
-    expect(getRunValueLimit()).toBe(5);
+    expect(getRunValueLimit()).toBe(10);
   });
 
   it("limits picks to three in co-op", () => {

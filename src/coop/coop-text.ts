@@ -47,6 +47,7 @@ const COOP_TEXT = {
   partnerReady: { en: "Partner: ready", ko: "파트너: 준비 완료" },
   waitingForReady: { en: "Ready! Cancel to pick again", ko: "준비 완료! 취소로 다시 고르기" },
   partnerLeft: { en: "Your partner left.", ko: "파트너가 나갔습니다." },
+  notEnoughPoints: { en: "Not enough points left. Pick again", ko: "남은 포인트가 부족합니다. 다시 고르기" },
   waitingForCommand: { en: "Waiting for your partner's command...", ko: "파트너의 입력을 기다리는 중..." },
   waitingForFleeAnswer: {
     en: "Waiting for your partner to agree to flee...",

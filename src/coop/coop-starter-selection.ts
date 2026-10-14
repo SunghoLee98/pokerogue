@@ -1,8 +1,12 @@
 /**
  * The co-op starter selection handshake.
  *
- * Each player picks on their own screen. Pressing start makes a player ready and sends their confirmed picks;
- * the peer only ever sees confirmed picks. A ready player may take it back while the partner is still picking.
+ * Each player picks on their own screen. The pokemon a player puts in their party are shared as they change
+ * (the cursor is not), and pressing start makes the player ready with them. A ready player may take it back while
+ * the partner is still picking.
+ * Both players share one starter point budget: a player's party takes its cost out of it, so the other player picks
+ * with what is left. If both become ready at once and their parties cost more than the budget together,
+ * the guest gives way: its ready is taken back and it picks again.
  * When both are ready the host decides the run: it sends `start` with the shared seed, both account snapshots,
  * both players' picks and its active timed event, and both clients start from that one message.
  * @module
@@ -24,9 +28,19 @@ export interface CoopStartInfo {
 }
 
 export interface CoopPartnerSelection {
-  /** The partner's confirmed picks; empty while they are not ready */
+  /** The pokemon in the partner's party, confirmed once they are ready */
   readonly picks: readonly CoopStarterPayload[];
   readonly ready: boolean;
+  /** The starter points the partner's party takes from the shared budget */
+  readonly cost: number;
+}
+
+/** The starter points of a party: what the picks cost and the budget both players share. */
+export interface CoopStarterPoints {
+  /** What the picks cost on the picking player's account */
+  cost: number;
+  /** Both players' shared starter point budget */
+  limit: number;
 }
 
 export interface CoopStarterSelectionOptions {
@@ -49,10 +63,14 @@ export class CoopStarterSelection {
   private readonly unsubscribes: Unsubscribe[];
 
   private localPicks: CoopStarterPayload[] = [];
+  private localPoints: CoopStarterPoints = { cost: 0, limit: 0 };
   private localAccount: CoopAccountSnapshot | null = null;
   private ready = false;
   private partnerPicks: CoopStarterPayload[] = [];
   private partnerReady = false;
+  private partnerCost = 0;
+  /** Whether the guest's last ready was taken back because both readied over the shared budget */
+  private yielded = false;
   private partnerAccount: CoopAccountSnapshot | null = null;
   private started: CoopStartInfo | null = null;
   private isClosed = false;
@@ -76,7 +94,12 @@ export class CoopStarterSelection {
   }
 
   get partner(): CoopPartnerSelection {
-    return { picks: this.partnerPicks, ready: this.partnerReady };
+    return { picks: this.partnerPicks, ready: this.partnerReady, cost: this.partnerCost };
+  }
+
+  /** Whether the local ready was taken back because the partner readied at the same time and took the points */
+  get readyYielded(): boolean {
+    return this.yielded;
   }
 
   /** The run both players agreed on, once started */
@@ -90,17 +113,38 @@ export class CoopStarterSelection {
   }
 
   /**
-   * Confirm the local picks and become ready.
-   * @throws If there are no picks or more than {@linkcode COOP_MAX_OWNED}, or the selection has started or closed
+   * Share the pokemon now in the local party, before ready.
+   * Ignored while ready (the party cannot change then) or once the selection has started or closed.
+   * @param points - What the picks cost and the shared budget
    */
-  setReady(picks: CoopStarterPayload[]): void {
+  setPicks(picks: CoopStarterPayload[], points: CoopStarterPoints): void {
+    if (this.ready || this.started || this.isClosed) {
+      return;
+    }
+    this.localPicks = [...picks];
+    this.localPoints = { ...points };
+    this.sendSelection();
+  }
+
+  /**
+   * Confirm the local picks and become ready.
+   * @param points - What the picks cost and the shared budget
+   * @throws If there are no picks or more than {@linkcode COOP_MAX_OWNED}, if the picks cost more than the partner
+   * left of the budget, or if the selection has started or closed
+   */
+  setReady(picks: CoopStarterPayload[], points: CoopStarterPoints): void {
     if (picks.length === 0 || picks.length > COOP_MAX_OWNED) {
       throw new Error(`a co-op player picks 1 to ${COOP_MAX_OWNED} starters, not ${picks.length}`);
+    }
+    if (points.cost > points.limit - this.partnerCost) {
+      throw new Error(`the picks cost ${points.cost} but only ${points.limit - this.partnerCost} points are left`);
     }
     if (this.started || this.isClosed) {
       throw new Error("the co-op starter selection is over");
     }
     this.localPicks = [...picks];
+    this.localPoints = { ...points };
+    this.yielded = false;
     this.localAccount = this.options.getAccount();
     this.ready = true;
     this.sendSelection();
@@ -108,18 +152,15 @@ export class CoopStarterSelection {
   }
 
   /**
-   * Take back the ready state to pick again.
+   * Take back the ready state to pick again. The picks stay shared as the party the player keeps picking from.
    * @returns `false` if the run has already started (the host's start wins)
    */
   cancelReady(): boolean {
     if (this.started) {
       return false;
     }
-    if (this.ready) {
-      this.ready = false;
-      this.localPicks = [];
-      this.sendSelection();
-    }
+    this.yielded = false;
+    this.unready();
     return true;
   }
 
@@ -142,11 +183,24 @@ export class CoopStarterSelection {
     this.startHandlers.clear();
   }
 
+  private unready(): void {
+    if (this.ready) {
+      this.ready = false;
+      this.sendSelection();
+    }
+  }
+
+  /** Whether both players are ready with picks that cost more than the shared budget together. */
+  private overBudget(): boolean {
+    return this.ready && this.partnerReady && this.localPoints.cost + this.partnerCost > this.localPoints.limit;
+  }
+
   private sendSelection(): void {
     this.transport.send({
       t: "starters",
-      picks: this.ready ? this.localPicks : [],
+      picks: this.localPicks,
       ready: this.ready,
+      cost: this.localPoints.cost,
       account: this.localAccount ?? this.options.getAccount(),
     });
   }
@@ -177,15 +231,27 @@ export class CoopStarterSelection {
 
   private handlePartnerSelection(message: StartersMessage): void {
     this.partnerReady = message.ready;
-    this.partnerPicks = message.ready ? message.picks : [];
+    this.partnerPicks = message.picks;
+    this.partnerCost = message.cost;
     this.partnerAccount = message.account;
+    // Both readied at once over the budget: the host's ready stands, the guest picks again with what is left.
+    if (this.role === "guest" && this.overBudget()) {
+      this.yielded = true;
+      this.unready();
+    }
     this.emitChange();
     this.tryStart();
   }
 
-  /** The host starts the run as soon as both players are ready. */
+  /**
+   * The host starts the run as soon as both players are ready, unless their picks cost more than the shared budget
+   * together; then it waits for the guest to give way.
+   */
   private tryStart(): void {
     if (this.role !== "host" || !this.ready || !this.partnerReady || !this.localAccount || !this.partnerAccount) {
+      return;
+    }
+    if (this.overBudget()) {
       return;
     }
     const info: CoopStartInfo = {
