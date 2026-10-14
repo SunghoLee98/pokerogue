@@ -13,6 +13,14 @@ export type RelayErrorReason = "notFound" | "full" | "badRequest";
 
 export type RelayControlMessage =
   | { t: "relay:code"; code: string }
-  | { t: "relay:paired" }
+  /** Sent to a client that took the host slot with a plain join (the host had left); otherwise the slot is the role. */
+  | { t: "relay:slot"; slot: RelaySlot }
+  /**
+   * Both players are in the room. `fresh` tells the player who stayed that a new client took the partner's place
+   * (a page that was reloaded or closed), not the same client coming back after a dropped connection.
+   */
+  | { t: "relay:paired"; fresh?: true }
   | { t: "relay:peerLeft" }
+  /** Sent to a client that took back its slot while the partner is away, so it stops retrying. */
+  | { t: "relay:waiting" }
   | { t: "relay:error"; reason: RelayErrorReason };

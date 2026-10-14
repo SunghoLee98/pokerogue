@@ -8,4 +8,8 @@ export class MockImage extends MockContainer {
     super(textureManager, x, y);
     this.texture = texture;
   }
+
+  setDisplaySize(_width: number, _height: number): this {
+    return this;
+  }
 }

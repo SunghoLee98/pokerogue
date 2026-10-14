@@ -5,16 +5,22 @@
  * Every cause ends the same way: the reason is shown, the host keeps the save made at the start of the current wave
  * (uploading it like solo "save and quit"), the guest saves no session, and both go back to the title screen.
  * While the connection is down, the game waits up to a minute for the partner before ending.
+ *
+ * When the partner drops for good (a reloaded or closed page, a connection that never came back) while this player is
+ * still connected, the room is kept instead: this player goes to a screen showing the join code again
+ * (see {@linkcode takeHeldCoopRoom}), the partner joins with it, and both continue from the save made at the start of
+ * the current wave, as long as this player does not leave.
  * @module
  */
 
 import { getSessionDataLocalStorageKey } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { hideCoopBanner, showCoopBanner } from "#coop/coop-banner";
-import type { CoopByeReason } from "#coop/coop-protocol";
+import type { CoopByeReason, CoopRole } from "#coop/coop-protocol";
 import { COOP_SESSION_SLOT, type CoopSession, coopSession } from "#coop/coop-session";
 import { type CoopTextKey, coopText } from "#coop/coop-text";
 import type { CoopTransport } from "#coop/coop-transport";
+import { ReliableCoopTransport } from "#coop/reliable-coop-transport";
 
 /** How co-op leaves a run. Replaced in tests. */
 export const coopExit = {
@@ -29,6 +35,7 @@ export const coopExit = {
 /** Why a co-op run ends; each has its own text. */
 export type CoopEndReason =
   | "connectionLost"
+  | "disconnected"
   | "partnerLeftRun"
   | "partnerSavedAndQuit"
   | "savingAndQuitting"
@@ -41,6 +48,26 @@ const BYE_REASONS: Partial<Record<CoopByeReason, CoopEndReason>> = {
 
 /** Transports whose run is ending, so that one ending does not start another. */
 const ending = new WeakSet<CoopTransport>();
+
+/** A relay room kept open after the partner dropped for good, for the partner to come back to. */
+export interface HeldCoopRoom {
+  /** The connection to the room, no longer numbering messages for the old partner */
+  transport: CoopTransport;
+  code: string;
+  /** This player's role once the partner is back (the player who stays in a lobby hosts the new one) */
+  role: CoopRole;
+  /** The save (JSON) both continue from, made at the start of the current wave; `null` for a lobby */
+  save: string | null;
+}
+
+let heldRoom: HeldCoopRoom | null = null;
+
+/** The room kept open for the partner to come back to, handed over once (the title screen opens it). */
+export function takeHeldCoopRoom(): HeldCoopRoom | null {
+  const room = heldRoom;
+  heldRoom = null;
+  return room;
+}
 
 /** How to reach the lobby (`coop-lobby.ts` registers it). */
 let lobbyExit: { transport(): CoopTransport | null; leave(): void } = {
@@ -91,7 +118,7 @@ export function watchCoopConnection(transport: CoopTransport): void {
             stopCountdown();
           } else if (Date.now() >= deadline) {
             stopCountdown();
-            endCoopRun("connectionLost");
+            holdCoopRoom("partnerGone");
           } else {
             show();
           }
@@ -101,9 +128,12 @@ export function watchCoopConnection(transport: CoopTransport): void {
     } else if (status === "connected" && timer !== null) {
       stopCountdown();
       hideCoopBanner();
+    } else if (status === "newPeer") {
+      stopCountdown();
+      holdCoopRoom("partnerReturned");
     } else if (status === "closed") {
       stopCountdown();
-      endCoopRun("connectionLost");
+      endCoopRun(transport.joinCode ? "disconnected" : "connectionLost");
     }
   });
 
@@ -127,6 +157,44 @@ async function saveWaveStart(session: CoopSession | null): Promise<void> {
   }
 }
 
+/** Stop what is still running (the run may end in the middle of a turn) and go back to the title screen. */
+function returnToTitle(): void {
+  // Nothing may touch the scene the reset clears.
+  globalScene.phaseManager.clearAllPhases();
+  globalScene.tweens.killAll();
+  coopExit.returnToTitle();
+}
+
+/**
+ * The partner dropped for good while this player is still connected: keep the room open for them.
+ * This player goes back to the title screen, which shows the join code again (see {@linkcode takeHeldCoopRoom}).
+ * Ends the run as usual where the room cannot be kept (no join code, or no wave start save to continue from).
+ * @param reason - What to tell the player
+ */
+function holdCoopRoom(reason: "partnerGone" | "partnerReturned"): void {
+  const transport = currentTransport();
+  if (!transport || ending.has(transport)) {
+    return;
+  }
+  const session = coopSession;
+  const code = transport.joinCode;
+  const save = session ? session.waveStartSave : null;
+  if (!(transport instanceof ReliableCoopTransport) || !code || (session && !save)) {
+    endCoopRun("connectionLost");
+    return;
+  }
+  ending.add(transport);
+  // Released now, so that what the returning partner sends waits for the title screen instead of reaching this run.
+  const room: HeldCoopRoom = { transport: transport.release(), code, role: session?.localRole ?? "host", save };
+  showCoopBanner(coopText(reason), false, true);
+  setTimeout(async () => {
+    await saveWaveStart(session);
+    heldRoom = room;
+    lobbyExit.leave();
+    returnToTitle();
+  }, coopExit.noticeMs);
+}
+
 /**
  * End the co-op run (or leave the lobby) and go back to the title screen.
  * Does nothing outside co-op or if the run is already ending.
@@ -143,13 +211,10 @@ export function endCoopRun(reason: CoopEndReason, bye?: CoopByeReason): void {
   if (bye) {
     transport.send({ t: "bye", reason: bye });
   }
-  showCoopBanner(coopText(reason satisfies CoopTextKey), false, true);
+  showCoopBanner(coopText(reason satisfies CoopTextKey, { code: transport.joinCode ?? "" }), false, true);
   setTimeout(async () => {
     await saveWaveStart(session);
     lobbyExit.leave();
-    // The run may end in the middle of a turn: stop what is still running, so nothing touches the scene it resets.
-    globalScene.phaseManager.clearAllPhases();
-    globalScene.tweens.killAll();
-    coopExit.returnToTitle();
+    returnToTitle();
   }, coopExit.noticeMs);
 }

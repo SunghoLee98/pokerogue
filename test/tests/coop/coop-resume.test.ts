@@ -122,10 +122,11 @@ describe("continuing a co-op run from the title screen", () => {
     await flush();
     const guest = await joinCoop("LOOP00", { createTransport: () => pair.guest, local: guestInfo() });
     expect(guest.peerResume).toBe(true);
-    const json = await waitForCoopResume(guest.transport);
+    const { session: json, role } = await waitForCoopResume(guest.transport);
     await game.phaseInterceptor.to("EncounterPhase", false);
 
     expect(JSON.parse(json).coop).toEqual(saved.coop);
+    expect(role).toBe("guest");
     expect(coopSession?.localRole).toBe("host");
     expect(game.scene.currentBattle.waveIndex).toBe(saved.waveIndex);
     expect(game.scene.phaseManager.getCurrentPhase()["loaded"]).toBe(true);

@@ -8,7 +8,17 @@ import type { CoopMessage } from "#coop/coop-protocol";
 
 export type Unsubscribe = () => void;
 
-export type CoopConnectionStatus = "connecting" | "waitingForPeer" | "connected" | "reconnecting" | "closed";
+/**
+ * - `newPeer`: a new client took the partner's place (the partner reloaded or closed the page and joined again with
+ *   the code). The old partner is gone for good, and the new one has not run the handshake yet.
+ */
+export type CoopConnectionStatus =
+  | "connecting"
+  | "waitingForPeer"
+  | "connected"
+  | "reconnecting"
+  | "newPeer"
+  | "closed";
 
 /**
  * A two-party connection.
@@ -23,6 +33,10 @@ export interface CoopTransport {
   /** Guest: connect using the host's join code. */
   join(joinCode: string): Promise<void>;
   send(message: CoopMessage): void;
+  /** The connection's current status (where the implementation reports it) */
+  readonly status?: CoopConnectionStatus;
+  /** The relay room's join code, once known (relay transports only) */
+  readonly joinCode?: string | null;
   onMessage(handler: (message: CoopMessage) => void): Unsubscribe;
   onStatusChange(handler: (status: CoopConnectionStatus) => void): Unsubscribe;
   close(): void;

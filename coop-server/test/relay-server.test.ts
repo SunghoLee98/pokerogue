@@ -116,6 +116,41 @@ describe("relay server", () => {
     assert.equal(await rejoined.next(), '{"t":"bye"}');
   });
 
+  it("tells the player who stayed when a new client takes the guest's place", async () => {
+    const { host, guest, code } = await pair();
+    guest.socket.close();
+    assert.deepEqual(await host.nextJson(), { t: "relay:peerLeft" });
+
+    const reloaded = open(`code=${code}`);
+    assert.deepEqual(await reloaded.nextJson(), { t: "relay:paired" });
+    assert.deepEqual(await host.nextJson(), { t: "relay:paired", fresh: true });
+  });
+
+  it("gives a returning host the host slot while the guest waits", async () => {
+    const { host, guest, code } = await pair();
+    host.socket.close();
+    assert.deepEqual(await guest.nextJson(), { t: "relay:peerLeft" });
+
+    const returned = open(`code=${code}`);
+    assert.deepEqual(await returned.nextJson(), { t: "relay:slot", slot: "host" });
+    assert.deepEqual(await returned.nextJson(), { t: "relay:paired" });
+    assert.deepEqual(await guest.nextJson(), { t: "relay:paired", fresh: true });
+
+    returned.socket.send('{"t":"hello"}');
+    assert.equal(await guest.next(), '{"t":"hello"}');
+  });
+
+  it("confirms a rejoin while the partner is away", async () => {
+    const { host, guest, code } = await pair();
+    guest.socket.close();
+    assert.deepEqual(await host.nextJson(), { t: "relay:peerLeft" });
+    host.socket.close();
+    await host.closed;
+
+    const rejoined = open(`code=${code}&rejoin=host`);
+    assert.deepEqual(await rejoined.nextJson(), { t: "relay:waiting" });
+  });
+
   it("does not forward relay control frames sent by a client", async () => {
     const { host, guest } = await pair();
     host.socket.send('{"t":"relay:peerLeft"}');

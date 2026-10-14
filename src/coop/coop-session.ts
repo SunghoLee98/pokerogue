@@ -25,6 +25,11 @@ export class CoopSession {
   timedEvent: string | null = null;
   /** Both players' account names, saved with the run (spec 3.8) */
   participants: Record<CoopRole, string> = { host: "", guest: "" };
+  /**
+   * The session save (JSON) made at the start of the current wave, on both clients. When the partner drops for good,
+   * the player who stays sends it to the partner coming back, and both continue from there.
+   */
+  waveStartSave: string | null = null;
   private readonly accountSnapshots = new Map<CoopRole, CoopAccountSnapshot>();
   private decisionSeq = 0;
 

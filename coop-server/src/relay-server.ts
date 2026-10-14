@@ -7,6 +7,8 @@ import { RELAY_PREFIX, type RelayControlMessage, type RelaySlot } from "./relay-
 import { RoomRegistry } from "./room-registry.ts";
 
 const SWEEP_INTERVAL_MS = 10_000;
+/** Ping every socket this often; one that has not answered the previous ping is dropped. */
+const HEARTBEAT_INTERVAL_MS = 30_000;
 
 export interface RelayServer {
   port: number;
@@ -40,9 +42,18 @@ function isControlFrame(text: string): boolean {
 export function startRelayServer(options: { port: number; host?: string }): Promise<RelayServer> {
   const registry = new RoomRegistry();
   const sockets = new Map<string, RoomSockets>();
+  /** Rooms where both players have been in at some point. */
+  const pairedRooms = new Set<string>();
+  /** Sockets that answered the last heartbeat ping. */
+  const alive = new WeakSet<WebSocket>();
   const wss = new WebSocketServer({ port: options.port, host: options.host });
 
-  const attach = (socket: WebSocket, code: string, slot: RelaySlot): void => {
+  /**
+   * @param fresh - The client joined with the code alone, not to take back its slot after a dropped connection
+   */
+  const attach = (socket: WebSocket, code: string, slot: RelaySlot, fresh = false): void => {
+    alive.add(socket);
+    socket.on("pong", () => alive.add(socket));
     const room = sockets.get(code) ?? {};
     sockets.set(code, room);
     room[slot] = socket;
@@ -58,7 +69,8 @@ export function startRelayServer(options: { port: number; host?: string }): Prom
       }
     });
 
-    socket.on("close", () => {
+    socket.on("close", (closeCode: number) => {
+      console.log(`coop relay: ${slot} left ${code} (close ${closeCode})`);
       const current = sockets.get(code);
       if (current?.[slot] !== socket) {
         return;
@@ -74,7 +86,8 @@ export function startRelayServer(options: { port: number; host?: string }): Prom
     const peer = room[otherSlot(slot)];
     if (peer) {
       sendControl(socket, { t: "relay:paired" });
-      sendControl(peer, { t: "relay:paired" });
+      sendControl(peer, fresh && pairedRooms.has(code) ? { t: "relay:paired", fresh: true } : { t: "relay:paired" });
+      pairedRooms.add(code);
     }
   };
 
@@ -100,27 +113,50 @@ export function startRelayServer(options: { port: number; host?: string }): Prom
       reject(socket, "badRequest", code);
       return;
     }
-    const slot: RelaySlot = rejoin ?? "guest";
-    const result = registry.join(code, slot);
-    if (result !== "ok") {
+    const result = registry.join(code, rejoin ?? undefined);
+    if (result === "notFound" || result === "full") {
       reject(socket, result, code);
       return;
     }
-    attach(socket, code, slot);
+    console.log(`coop relay: ${result} ${rejoin ? "rejoined" : "joined"} ${code}`);
+    if (!rejoin && result === "host") {
+      sendControl(socket, { t: "relay:slot", slot: result });
+    }
+    attach(socket, code, result, rejoin === null);
+    if (rejoin && !sockets.get(code)?.[otherSlot(result)]) {
+      sendControl(socket, { t: "relay:waiting" });
+    }
   });
 
   const sweepTimer = setInterval(() => {
     for (const code of registry.sweep()) {
+      console.log(`coop relay: room ${code} closed`);
       const room = sockets.get(code);
       sockets.delete(code);
+      pairedRooms.delete(code);
       room?.host?.close();
       room?.guest?.close();
     }
   }, SWEEP_INTERVAL_MS);
   sweepTimer.unref();
 
+  // Without traffic, a connection that died on the way (a phone losing signal) never closes on its own,
+  // and the room would keep that player's slot taken.
+  const heartbeatTimer = setInterval(() => {
+    for (const client of wss.clients) {
+      if (!alive.has(client)) {
+        client.terminate();
+        continue;
+      }
+      alive.delete(client);
+      client.ping();
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+  heartbeatTimer.unref();
+
   const close = (): Promise<void> => {
     clearInterval(sweepTimer);
+    clearInterval(heartbeatTimer);
     for (const client of wss.clients) {
       client.terminate();
     }

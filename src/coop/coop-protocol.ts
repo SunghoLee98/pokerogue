@@ -136,7 +136,8 @@ export type CoopMessage = CoopMessageBody & { n?: number };
 type CoopMessageBody =
   /**
    * The first message on a new connection. `trainerId` tells accounts apart where every name is the same (offline),
-   * `resume` is set by a host continuing a saved run.
+   * `resume` is set by a player continuing a saved run: a host continuing it from the title screen, or the player
+   * who stayed in the room when the partner comes back.
    */
   | {
       t: "hello";
@@ -198,8 +199,11 @@ type CoopMessageBody =
       seq?: number;
       accepted: boolean;
     }
-  /** Sent by a host continuing a saved run: the saved session (JSON, `coop` block included) both clients load. */
-  | { t: "resume"; session: string }
+  /**
+   * Sent by the player continuing a saved run: the saved session (JSON, `coop` block included) both clients load.
+   * `role` is the receiver's role in that run (default `guest`).
+   */
+  | { t: "resume"; session: string; role?: CoopRole }
   | { t: "bye"; reason?: CoopByeReason }
   /** Every message numbered up to `n` has arrived; the sender need not resend them. */
   | { t: "ack"; n: number };

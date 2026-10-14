@@ -31,13 +31,34 @@ export class ReliableCoopTransport implements CoopTransport {
   private readonly ahead = new Map<number, CoopMessage>();
   private sinceAck = 0;
   private interrupted = false;
+  private released = false;
+  private readonly unsubscribes: Unsubscribe[];
 
   /** @param inner - A connected transport, after the handshake */
   constructor(inner: CoopTransport) {
     this.inner = inner;
     this.listeners.setStatus("connected");
-    inner.onMessage(message => this.receive(message));
-    inner.onStatusChange(status => this.changeStatus(status));
+    this.unsubscribes = [
+      inner.onMessage(message => this.receive(message)),
+      inner.onStatusChange(status => this.changeStatus(status)),
+    ];
+  }
+
+  get joinCode(): string | null {
+    return this.inner.joinCode ?? null;
+  }
+
+  /**
+   * Hand the connection over for a new partner, whose message numbers start over.
+   * From now on this wrapper neither sends nor closes, and its listeners hear nothing more.
+   * @returns The connection underneath
+   */
+  release(): CoopTransport {
+    this.released = true;
+    for (const unsubscribe of this.unsubscribes) {
+      unsubscribe();
+    }
+    return this.inner;
   }
 
   get status(): CoopConnectionStatus {
@@ -54,6 +75,9 @@ export class ReliableCoopTransport implements CoopTransport {
 
   /** Number the message and send it; it is kept until confirmed, so a send while disconnected is not lost. */
   send(message: CoopMessage): void {
+    if (this.released) {
+      return;
+    }
     const numbered = { ...message, n: this.nextOut++ };
     this.outbox.push(numbered);
     this.inner.send(numbered);
@@ -68,7 +92,9 @@ export class ReliableCoopTransport implements CoopTransport {
   }
 
   close(): void {
-    this.inner.close();
+    if (!this.released) {
+      this.inner.close();
+    }
   }
 
   private changeStatus(status: CoopConnectionStatus): void {

@@ -30,6 +30,10 @@ const COOP_TEXT = {
     en: "Join code: {{code}}\nWaiting for your partner to join...",
     ko: "참가 코드: {{code}}\n파트너가 들어오기를 기다리는 중...",
   },
+  waitingForPartnerReturn: {
+    en: "Join code: {{code}}\nWaiting for your partner to come back...",
+    ko: "참가 코드: {{code}}\n파트너가 돌아오기를 기다리는 중...",
+  },
   connecting: { en: "Connecting...", ko: "연결하는 중..." },
   invalidCode: { en: "That join code is not valid.", ko: "참가 코드가 올바르지 않습니다." },
   codeNotFound: { en: "No game was found for that code.", ko: "그 코드의 게임을 찾을 수 없습니다." },
@@ -93,6 +97,18 @@ const COOP_TEXT = {
   connectionLost: {
     en: "Your partner did not come back. Returning to the title screen.",
     ko: "파트너와 다시 연결되지 않았습니다. 타이틀로 돌아갑니다.",
+  },
+  partnerGone: {
+    en: "Your partner did not come back. Keeping the game open for them.",
+    ko: "파트너가 돌아오지 않았습니다. 파트너가 다시 들어올 수 있게 방을 유지합니다.",
+  },
+  partnerReturned: {
+    en: "Your partner is back. Reconnecting...",
+    ko: "파트너가 다시 들어왔습니다. 다시 연결하는 중...",
+  },
+  disconnected: {
+    en: "The connection was lost. If your partner is still waiting, join again with code {{code}}.",
+    ko: "연결이 끊겼습니다. 파트너가 기다리고 있다면 코드 {{code}}로 다시 참가하세요.",
   },
   partnerLeftRun: {
     en: "Your partner left. Returning to the title screen.",

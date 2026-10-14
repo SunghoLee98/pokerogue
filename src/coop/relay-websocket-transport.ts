@@ -26,8 +26,10 @@ export type RelayErrorReason = "notFound" | "full" | "badRequest";
 
 type RelayControlMessage =
   | { t: "relay:code"; code: string }
-  | { t: "relay:paired" }
+  | { t: "relay:slot"; slot: CoopRole }
+  | { t: "relay:paired"; fresh?: true }
   | { t: "relay:peerLeft" }
+  | { t: "relay:waiting" }
   | { t: "relay:error"; reason: RelayErrorReason };
 
 const RECONNECT_INTERVAL_MS = 2_000;
@@ -56,7 +58,10 @@ export class RelayWebSocketTransport implements CoopTransport {
   private readonly createSocket: (url: string) => WebSocket;
   private socket: WebSocket | null = null;
   private role: CoopRole | null = null;
+  /** The relay slot to take back after a dropped connection, when it is not the role (a returning host joins). */
+  private slot: CoopRole | null = null;
   private code: string | null = null;
+  private everPaired = false;
   /** The `host()` or `join()` call waiting for the relay to answer. */
   private pending: PendingConnect | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -82,6 +87,14 @@ export class RelayWebSocketTransport implements CoopTransport {
       this.pending = { resolve, reject };
       this.open({ code: joinCode });
     });
+  }
+
+  get status(): CoopConnectionStatus {
+    return this.listeners.status;
+  }
+
+  get joinCode(): string | null {
+    return this.code;
   }
 
   send(message: CoopMessage): void {
@@ -141,13 +154,22 @@ export class RelayWebSocketTransport implements CoopTransport {
         this.listeners.setStatus("waitingForPeer");
         this.settlePending();
         break;
+      case "relay:slot":
+        this.slot = control.slot;
+        break;
       case "relay:paired":
         this.clearReconnectTimers();
-        this.listeners.setStatus("connected");
+        this.listeners.setStatus(control.fresh && this.everPaired ? "newPeer" : "connected");
+        this.everPaired = true;
         this.settlePending();
         break;
       case "relay:peerLeft":
         this.listeners.setStatus("reconnecting");
+        break;
+      case "relay:waiting":
+        // Back in the room, but the partner is away: stop retrying and keep waiting for them.
+        this.clearReconnectTimers();
+        this.listeners.setStatus(this.everPaired ? "reconnecting" : "waitingForPeer");
         break;
       case "relay:error":
         // While rejoining, "full" means the relay has not noticed our old socket dropping yet: keep retrying.
@@ -171,7 +193,7 @@ export class RelayWebSocketTransport implements CoopTransport {
     this.giveUpTimer ??= setTimeout(() => this.shutDown(new Error("coop reconnect timed out")), RECONNECT_GIVE_UP_MS);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.open({ code: this.code!, rejoin: this.role! });
+      this.open({ code: this.code!, rejoin: this.slot ?? this.role! });
     }, RECONNECT_INTERVAL_MS);
   }
 
