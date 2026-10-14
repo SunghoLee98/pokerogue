@@ -16,7 +16,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { TitlePhase } from "#phases/title-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { createTestStarterPayload } from "#test/utils/coop-replay";
+import { createTestStarterPayload, FREE_POINTS } from "#test/utils/coop-replay";
 import type { Starter } from "#types/save-data";
 import Phaser from "phaser";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -83,18 +83,20 @@ describe("CoopStarterSelectController", () => {
     });
     const view = new FakePartnerView();
     const started: Starter[][] = [];
-    const controller = new CoopStarterSelectController(
-      local,
-      view,
-      starters => started.push(starters),
-      s => createTestStarterPayload(s.speciesId),
-    );
+    let limitChanges = 0;
+    const controller = new CoopStarterSelectController(local, view, starters => started.push(starters), {
+      buildPayload: s => createTestStarterPayload(s.speciesId),
+      getSharedLimit: () => 10,
+      // Every starter costs 3 points
+      getCost: starters => starters.length * 3,
+      onLimitChange: () => limitChanges++,
+    });
     cleanUps.push(() => {
       controller.destroy();
       local.dispose();
       partner.dispose();
     });
-    return { pair, local, partner, view, started, controller };
+    return { pair, local, partner, view, started, controller, limitChanges: () => limitChanges };
   }
 
   it("confirming sends ready instead of starting", async () => {
@@ -103,7 +105,11 @@ describe("CoopStarterSelectController", () => {
     expect(controller.confirm([starter(SpeciesId.CHARMANDER)])).toBe(true);
     await flush();
 
-    expect(partner.partner).toEqual({ picks: [createTestStarterPayload(SpeciesId.CHARMANDER)], ready: true });
+    expect(partner.partner).toEqual({
+      picks: [createTestStarterPayload(SpeciesId.CHARMANDER)],
+      ready: true,
+      cost: 3,
+    });
     expect(view.status).toBe(coopText("waitingForReady"));
     expect(started).toEqual([]);
   });
@@ -117,7 +123,7 @@ describe("CoopStarterSelectController", () => {
     expect(controller.processInput(Button.CANCEL)).toBe(true);
     await flush();
 
-    expect(partner.partner).toEqual({ picks: [], ready: false });
+    expect(partner.partner).toEqual({ picks: [], ready: false, cost: 0 });
     expect(controller.processInput(Button.CANCEL)).toBe(false);
   });
 
@@ -125,7 +131,7 @@ describe("CoopStarterSelectController", () => {
     const { partner, view } = await setUp();
     expect(view.status).toBe(coopText("partnerPicking"));
 
-    partner.setReady([createTestStarterPayload(SpeciesId.PIKACHU)]);
+    partner.setReady([createTestStarterPayload(SpeciesId.PIKACHU)], FREE_POINTS);
     await flush();
 
     expect(view.partner).toEqual({ picks: [createTestStarterPayload(SpeciesId.PIKACHU)], ready: true });
@@ -135,11 +141,62 @@ describe("CoopStarterSelectController", () => {
   it("starts with the local starters when both are ready", async () => {
     const { partner, started, controller } = await setUp();
     controller.confirm([starter(SpeciesId.CHARMANDER), starter(SpeciesId.SQUIRTLE)]);
-    partner.setReady([createTestStarterPayload(SpeciesId.PIKACHU)]);
+    partner.setReady([createTestStarterPayload(SpeciesId.PIKACHU)], FREE_POINTS);
     await flush();
 
     expect(started).toEqual([[starter(SpeciesId.CHARMANDER), starter(SpeciesId.SQUIRTLE)]]);
     expect(controller.processInput(Button.CANCEL)).toBe(true);
+  });
+
+  it("sends what the starters cost", async () => {
+    const { partner, controller } = await setUp();
+    controller.confirm([starter(SpeciesId.CHARMANDER), starter(SpeciesId.SQUIRTLE)]);
+    await flush();
+
+    expect(partner.partner.cost).toBe(6);
+  });
+
+  it("limits the player to the points the partner's ready left", async () => {
+    const { local, partner, view, controller, limitChanges } = await setUp();
+    expect(controller.valueLimit).toBe(10);
+
+    partner.setReady([createTestStarterPayload(SpeciesId.MEWTWO)], { cost: 7, limit: 10 });
+    await flush();
+    expect(controller.valueLimit).toBe(3);
+    expect(limitChanges()).toBe(1);
+
+    expect(controller.confirm([starter(SpeciesId.CHARMANDER), starter(SpeciesId.SQUIRTLE)])).toBe(true);
+    expect(local.localReady).toBe(false);
+    expect(view.status).toBe(coopText("notEnoughPoints"));
+
+    controller.confirm([starter(SpeciesId.CHARMANDER)]);
+    await flush();
+    expect(local.startInfo).not.toBeNull();
+  });
+
+  it("gives the points back when the partner unreadies", async () => {
+    const { partner, view, controller, limitChanges } = await setUp();
+    partner.setReady([createTestStarterPayload(SpeciesId.MEWTWO)], { cost: 7, limit: 10 });
+    await flush();
+    controller.confirm([starter(SpeciesId.CHARMANDER), starter(SpeciesId.SQUIRTLE)]);
+    partner.cancelReady();
+    await flush();
+
+    expect(controller.valueLimit).toBe(10);
+    expect(limitChanges()).toBe(2);
+    expect(view.status).toBe(coopText("partnerPicking"));
+  });
+
+  it("tells the guest when the host took the points first", async () => {
+    const { local, partner, view, controller } = await setUp();
+    partner.setReady([createTestStarterPayload(SpeciesId.MEWTWO)], { cost: 7, limit: 10 });
+    controller.confirm([starter(SpeciesId.CHARMANDER), starter(SpeciesId.SQUIRTLE)]);
+    await flush();
+    await flush();
+
+    expect(local.localReady).toBe(false);
+    expect(view.status).toBe(coopText("notEnoughPoints"));
+    expect(partner.startInfo).toBeNull();
   });
 
   it("tells the player when the partner left", async () => {
@@ -195,6 +252,7 @@ describe("co-op starter select phase", () => {
       t: "starters",
       picks: [createTestStarterPayload(SpeciesId.PIKACHU)],
       ready: true,
+      cost: 1,
       account: emptySnapshot,
     });
     await flush();
@@ -232,8 +290,8 @@ describe("co-op starter select phase", () => {
     const starterSelectCallback = starterSelectCall?.[1] as (starters: Starter[]) => void;
     expect(starterSelectCallback).toBeTypeOf("function");
 
-    lobby.selection.setReady([createTestStarterPayload(SpeciesId.CHARMANDER)]);
-    host.setReady([createTestStarterPayload(SpeciesId.BULBASAUR)]);
+    lobby.selection.setReady([createTestStarterPayload(SpeciesId.CHARMANDER)], FREE_POINTS);
+    host.setReady([createTestStarterPayload(SpeciesId.BULBASAUR)], FREE_POINTS);
     await flush();
     starterSelectCallback([starter(SpeciesId.CHARMANDER)]);
     await game.phaseInterceptor.to("EncounterPhase");

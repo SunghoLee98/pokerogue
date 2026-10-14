@@ -26,7 +26,7 @@ import type {
 import { getCoopRewardGen, submitCoopRewardAction } from "#coop/coop-reward";
 import { coopSession, setCoopSession } from "#coop/coop-session";
 import { createAccountSnapshot } from "#coop/coop-sim-data";
-import { CoopStarterSelection, type CoopStartInfo } from "#coop/coop-starter-selection";
+import { type CoopStarterPoints, CoopStarterSelection, type CoopStartInfo } from "#coop/coop-starter-selection";
 import { type CoopStateSnapshot, captureCoopState, hashCoopState } from "#coop/coop-state-hash";
 import type { CoopTransport } from "#coop/coop-transport";
 import { createLoopbackPair } from "#coop/loopback-transport";
@@ -330,8 +330,8 @@ export async function selectCoopStart(
     }),
     guest: new CoopStarterSelection("guest", transports.guest, { getAccount: () => sides.guest.account }),
   };
-  selections.guest.setReady(sides.guest.picks);
-  selections.host.setReady(sides.host.picks);
+  selections.guest.setReady(sides.guest.picks, FREE_POINTS);
+  selections.host.setReady(sides.host.picks, FREE_POINTS);
   // Let the loopback deliver the guest's selection and the host's start.
   await new Promise<void>(resolve => setTimeout(resolve, 0));
 
@@ -409,6 +409,9 @@ function prepareAccounts(game: GameManager, options: CoopReplayOptions): Record<
   }
   return snapshots;
 }
+
+/** Starter points for a ready whose picks cost nothing, so they always fit the shared budget. */
+export const FREE_POINTS: CoopStarterPoints = { cost: 0, limit: 10 };
 
 /**
  * A fixed starter payload for a species, as a player would send it.

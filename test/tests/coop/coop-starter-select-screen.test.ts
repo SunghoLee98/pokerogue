@@ -114,12 +114,13 @@ describe("co-op on the starter select screen", () => {
       t: "starters",
       picks: [createTestStarterPayload(SpeciesId.PIKACHU)],
       ready: true,
+      cost: 1,
       account: emptySnapshot,
     });
     await flush();
     expect(visible()).toEqual([false, true, true]);
 
-    pair.host.send({ t: "starters", picks: [], ready: false, account: emptySnapshot });
+    pair.host.send({ t: "starters", picks: [], ready: false, cost: 0, account: emptySnapshot });
     await flush();
     expect(visible()).toEqual([true, true, true]);
 
@@ -127,6 +128,7 @@ describe("co-op on the starter select screen", () => {
       t: "starters",
       picks: [createTestStarterPayload(SpeciesId.PIKACHU)],
       ready: true,
+      cost: 1,
       account: emptySnapshot,
     });
     await flush();

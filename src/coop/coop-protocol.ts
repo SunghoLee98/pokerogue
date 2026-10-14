@@ -12,7 +12,7 @@ import type { SpeciesId } from "#enums/species-id";
 import type { Variant } from "#sprites/variant";
 
 /** Bumped whenever a message shape changes incompatibly. Peers with different versions refuse to connect. */
-export const COOP_PROTOCOL_VERSION = 5;
+export const COOP_PROTOCOL_VERSION = 6;
 
 export type CoopRole = "host" | "guest";
 
@@ -150,7 +150,7 @@ type CoopMessageBody =
    * A player's starter selection. `picks` is only filled while `ready` (only confirmed picks are shown to the peer).
    * `account` is the sender's account snapshot, read for their pokemon once the run starts.
    */
-  | { t: "starters"; picks: CoopStarterPayload[]; ready: boolean; account: CoopAccountSnapshot }
+  | { t: "starters"; picks: CoopStarterPayload[]; ready: boolean; cost: number; account: CoopAccountSnapshot }
   /**
    * Sent by the host only, when both players are ready. Everything both clients need to create the same run:
    * the shared seed, both account snapshots, both players' picks and the host's active timed event (`null` for none).

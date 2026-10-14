@@ -48,7 +48,11 @@ PokeRogue 본가는 계속 업데이트되므로, 협동 기능은 **코어 코�
 
 ### 3.2 스타터 선택 (결정)
 - 각자 **자기 계정의 도감, 알, 캔디, 해금 상태**로 스타터를 고른다.
-- 코스트 한도는 솔로 클래식 한도(`getRunValueLimit()`, 기본 10)의 **절반인 5**를 각자 가진다. (설계자 판단: 고정값 5가 아니라 `getRunValueLimit()`의 절반으로 계산해서, 이후 한도 변경에도 따라가게 한다.)
+- 코스트 한도는 솔로 클래식 한도(`getRunValueLimit()`, 기본 10)를 **두 사람이 공용 풀로 나눠 쓴다**. (결정: 처음엔 5/5로 나눴지만, 4코스트 스타터를 고르면 포인트가 남고 6코스트 이상(109종)은 아예 고를 수 없어서 바꿨다)
+  - 내 한도는 "공용 한도 − 상대가 레디한 픽의 코스트"다. 상대가 레디하지 않았으면 공용 한도 전부다.
+  - 먼저 레디한 사람이 포인트를 가져가고, 레디를 취소하면 돌려준다. 코스트는 캔디로 줄인 값까지 반영해 **고른 사람의 계정 기준**으로 계산해서 `starters` 메시지에 함께 보낸다.
+  - 상대가 레디해서 내 파티가 남은 포인트를 넘으면, 시작을 눌러도 레디되지 않고 "남은 포인트가 부족합니다"를 띄운다.
+  - 두 사람이 거의 동시에 레디해서 합이 공용 한도를 넘으면 **게스트가 양보한다**. 게스트의 레디가 자동으로 취소되고 남은 포인트로 다시 고른다. 호스트는 합이 한도 안일 때만 `start`를 보낸다. (설계자 판단)
 - 각자 최대 **3마리**를 고른다.
 - 상대가 **확정한 포켓몬만** 내 화면 한쪽에 보인다. 커서 위치나 고민 중인 후보는 보이지 않는다.
 - 둘 다 "시작"을 누르면 레디 상태가 되고, 두 명 모두 레디가 되면 게임이 시작된다.
@@ -242,7 +246,7 @@ interface CoopTransport {
 ```ts
 type CoopMessage =
   | { t: "hello"; gameVersion: string; protocol: number; accountName: string }
-  | { t: "starters"; picks: CoopStarterPayload[]; ready: boolean }
+  | { t: "starters"; picks: CoopStarterPayload[]; ready: boolean; cost: number } // cost: 레디한 픽의 코스트(보낸 사람 계정 기준)
   | { t: "start"; seed: string; hostWorldData: CoopWorldData } // 호스트만 보냄. 세계 단위 계정 데이터 스냅샷 포함
   | { t: "turnCommand"; turn: number; wave: number; command: TurnCommandPayload }
   | { t: "choice"; kind: CoopChoiceKind; wave: number; payload: unknown } // 보상, 바이옴, ME, 진화 등

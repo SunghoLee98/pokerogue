@@ -11,7 +11,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
-import { createTestStarterPayload } from "#test/utils/coop-replay";
+import { createTestStarterPayload, FREE_POINTS } from "#test/utils/coop-replay";
 import Phaser from "phaser";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -198,8 +198,8 @@ describe("co-op run from the lobby", () => {
       { getAccount: () => emptySnapshot },
     );
     const guest = new CoopStarterSelection("guest", pair.guest, { getAccount: () => emptySnapshot });
-    lobby.selection.setReady([createTestStarterPayload(SpeciesId.BULBASAUR)]);
-    guest.setReady([createTestStarterPayload(SpeciesId.CHARMANDER)]);
+    lobby.selection.setReady([createTestStarterPayload(SpeciesId.BULBASAUR)], FREE_POINTS);
+    guest.setReady([createTestStarterPayload(SpeciesId.CHARMANDER)], FREE_POINTS);
     await flush();
     expect(lobby.selection.startInfo).not.toBeNull();
 

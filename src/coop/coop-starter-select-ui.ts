@@ -1,6 +1,7 @@
 /**
  * Co-op on the starter select screen: pressing start makes the player ready instead of starting the run,
  * cancel takes the ready back, and the partner's confirmed picks are shown beside the player's own.
+ * Both players share the solo starter point budget, so the player's limit is what the partner's ready picks left.
  * @module
  */
 
@@ -9,13 +10,15 @@ import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { coopLobby } from "#coop/coop-lobby";
 import type { CoopStarterPayload } from "#coop/coop-protocol";
 import { buildStarterPayload } from "#coop/coop-starter-payload";
-import type { CoopStarterSelection } from "#coop/coop-starter-selection";
+import type { CoopStarterPoints, CoopStarterSelection } from "#coop/coop-starter-selection";
 import { coopText } from "#coop/coop-text";
 import type { Unsubscribe } from "#coop/coop-transport";
 import { Gender } from "#data/gender";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import type { Starter } from "#types/save-data";
+import type { StarterSpeciesId } from "#types/starter-species-id";
+import { getPartyValue, getRunValueLimit } from "#ui/starter-select-ui-utils";
 import { addTextObject } from "#ui/text";
 
 /** Where the partner's picks and the co-op status are drawn. */
@@ -26,32 +29,58 @@ export interface CoopPartnerView {
   destroy(): void;
 }
 
+export interface CoopStarterSelectOptions {
+  /** Turns a local starter into a payload. Default: {@linkcode buildStarterPayload} */
+  buildPayload?(starter: Starter): CoopStarterPayload;
+  /** The starter point budget both players share. Default: the solo limit, {@linkcode getRunValueLimit} */
+  getSharedLimit?(): number;
+  /** What the starters cost on the local account. Default: {@linkcode getPartyValue} */
+  getCost?(starters: readonly Starter[]): number;
+  /** Called when the partner's ready changes the local player's point limit */
+  onLimitChange?(): void;
+}
+
 export class CoopStarterSelectController {
   private readonly selection: CoopStarterSelection;
   private readonly view: CoopPartnerView;
   private readonly buildPayload: (starter: Starter) => CoopStarterPayload;
+  private readonly getSharedLimit: () => number;
+  private readonly getCost: (starters: readonly Starter[]) => number;
+  private readonly onLimitChange: () => void;
   private readonly unsubscribes: Unsubscribe[];
   /** The starters of the last ready, handed to the start callback */
   private confirmedStarters: Starter[] = [];
+  /** The partner's cost when {@linkcode onLimitChange} last ran */
+  private lastPartnerCost = 0;
+  /** Whether the last confirm was refused because the starters cost more than the points left */
+  private overLimit = false;
 
   /**
    * @param onStart - Called once when the run starts, with the local player's starters
-   * @param buildPayload - Turns a local starter into a payload; default {@linkcode buildStarterPayload}
    */
   constructor(
     selection: CoopStarterSelection,
     view: CoopPartnerView,
     onStart: (starters: Starter[]) => void,
-    buildPayload: (starter: Starter) => CoopStarterPayload = starter => buildStarterPayload(starter),
+    options: CoopStarterSelectOptions = {},
   ) {
     this.selection = selection;
     this.view = view;
-    this.buildPayload = buildPayload;
+    this.buildPayload = options.buildPayload ?? (starter => buildStarterPayload(starter));
+    this.getSharedLimit = options.getSharedLimit ?? getRunValueLimit;
+    this.getCost =
+      options.getCost ?? (starters => getPartyValue(starters.map(starter => starter.speciesId as StarterSpeciesId)));
+    this.onLimitChange = options.onLimitChange ?? (() => {});
     this.unsubscribes = [
       selection.onChange(() => this.render()),
       selection.onStart(() => onStart(this.confirmedStarters)),
     ];
     this.render();
+  }
+
+  /** The local player's starter point limit: what the partner's ready picks left of the shared budget. */
+  get valueLimit(): number {
+    return this.getSharedLimit() - this.selection.partner.cost;
   }
 
   /**
@@ -63,8 +92,15 @@ export class CoopStarterSelectController {
       this.render();
       return true;
     }
-    this.confirmedStarters = [...starters];
-    this.selection.setReady(starters.map(starter => this.buildPayload(starter)));
+    const points: CoopStarterPoints = { cost: this.getCost(starters), limit: this.getSharedLimit() };
+    this.overLimit = points.cost > this.valueLimit;
+    if (!this.overLimit) {
+      this.confirmedStarters = [...starters];
+      this.selection.setReady(
+        starters.map(starter => this.buildPayload(starter)),
+        points,
+      );
+    }
     this.render();
     return true;
   }
@@ -96,13 +132,24 @@ export class CoopStarterSelectController {
 
   private render(): void {
     const { partner } = this.selection;
+    const limitChanged = partner.cost !== this.lastPartnerCost;
+    if (limitChanged) {
+      this.lastPartnerCost = partner.cost;
+      this.overLimit = false;
+    }
     this.view.setPartner(partner.picks, partner.ready);
     if (this.selection.closed) {
       this.view.setStatus(coopText("partnerLeft"));
     } else if (this.selection.localReady) {
+      this.overLimit = false;
       this.view.setStatus(coopText("waitingForReady"));
+    } else if (partner.ready && (this.selection.readyYielded || this.overLimit)) {
+      this.view.setStatus(coopText("notEnoughPoints"));
     } else {
       this.view.setStatus(coopText(partner.ready ? "partnerReady" : "partnerPicking"));
+    }
+    if (limitChanged) {
+      this.onLimitChange();
     }
   }
 }
@@ -173,16 +220,18 @@ class PhaserCoopPartnerView implements CoopPartnerView {
 /**
  * Set up co-op on the starter select screen, if the player is in a co-op lobby.
  * @param onStart - Called when the run starts, with the local player's starters
+ * @param onLimitChange - Called when the partner's ready changes the player's starter point limit
  * @returns The controller, or `null` outside co-op
  */
 export function createCoopStarterSelectUi(
   container: Phaser.GameObjects.Container,
   layout: CoopStarterSelectLayout,
   onStart: (starters: Starter[]) => void,
+  onLimitChange: () => void = () => {},
 ): CoopStarterSelectController | null {
   if (!coopLobby) {
     return null;
   }
   const view = new PhaserCoopPartnerView(container, layout, 3);
-  return new CoopStarterSelectController(coopLobby.selection, view, onStart);
+  return new CoopStarterSelectController(coopLobby.selection, view, onStart, { onLimitChange });
 }
