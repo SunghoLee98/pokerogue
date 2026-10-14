@@ -9,8 +9,10 @@
 import { globalScene } from "#app/global-scene";
 import { attachCoopChecksums } from "#coop/coop-checksum";
 import { type CoopConnection, type CoopLocalInfo, getLocalCoopInfo, hostCoop } from "#coop/coop-connect";
-import { watchCoopConnection } from "#coop/coop-exit";
+import { type HeldCoopRoom, watchCoopConnection } from "#coop/coop-exit";
 import { arrangeCoopParty, queueCoopSwitchQuestions, soloAsksSwitch } from "#coop/coop-field";
+import type { CoopHandshakeResult } from "#coop/coop-handshake";
+import { CoopVersionMismatchError, performHandshake } from "#coop/coop-handshake";
 import { CoopOwnership } from "#coop/coop-ownership";
 import type { CoopRole } from "#coop/coop-protocol";
 import { restoreCoopRewardCounters } from "#coop/coop-reward";
@@ -18,6 +20,7 @@ import { normalizeCoopSaveData } from "#coop/coop-save";
 import { COOP_SESSION_SLOT, CoopSession, coopSession, setCoopSession } from "#coop/coop-session";
 import type { CoopTransport, Unsubscribe } from "#coop/coop-transport";
 import { attachCoopWaitButton } from "#coop/coop-wait-button";
+import { ReliableCoopTransport } from "#coop/reliable-coop-transport";
 import type { SessionSaveData } from "#types/save-data";
 
 /** `GameData.initSessionFromData` is private; co-op resumes through it the way loading a slot does. */
@@ -44,6 +47,8 @@ export async function resumeCoopRun(role: CoopRole, transport: CoopTransport, se
   session.timedEvent = coop.timedEvent;
   session.participants = { ...coop.participants };
   session.restoreDecisionCount(coop.decisionSeq);
+  // The loaded run starts a wave without saving it again.
+  session.waveStartSave = sessionJson;
   setCoopSession(session);
   watchCoopConnection(transport);
   attachCoopWaitButton(session);
@@ -105,10 +110,20 @@ export async function readCoopSave(): Promise<SessionSaveData | null> {
   }
 }
 
-/** Whether the partner who joined is the guest saved with the run: same account name and trainer id. */
-export function isSavedPartner(saved: SessionSaveData, partner: CoopConnection): boolean {
+/**
+ * Whether the partner who joined is the one saved with the run: same account name and trainer id.
+ * @param partnerRole - The partner's role in the run
+ */
+export function isSavedPartner(
+  saved: Pick<SessionSaveData, "coop">,
+  partner: CoopHandshakeResult,
+  partnerRole: CoopRole = "guest",
+): boolean {
   const coop = normalizeCoopSaveData(saved.coop);
-  return partner.peerAccountName === coop.participants.guest && partner.peerTrainerId === coop.accounts.guest.trainerId;
+  return (
+    partner.peerAccountName === coop.participants[partnerRole]
+    && partner.peerTrainerId === coop.accounts[partnerRole].trainerId
+  );
 }
 
 /**
@@ -134,12 +149,17 @@ export async function hostCoopResume(
   return { connection, json };
 }
 
+/** What the player continuing a saved run sends: the JSON both clients load, and our role in that run. */
+export interface CoopResumeInfo {
+  session: string;
+  role: CoopRole;
+}
+
 /**
- * Guest: wait for the saved session from a host continuing a run.
- * @returns The JSON both clients load
+ * Joiner: wait for the saved session from the player continuing a run.
  * @throws {@linkcode CoopWrongAccountError} if the host turned us away, or an error if the host left
  */
-export function waitForCoopResume(transport: CoopTransport): Promise<string> {
+export function waitForCoopResume(transport: CoopTransport): Promise<CoopResumeInfo> {
   return new Promise((resolve, reject) => {
     const unsubscribes: Unsubscribe[] = [];
     const finish = (settle: () => void) => {
@@ -158,7 +178,7 @@ export function waitForCoopResume(transport: CoopTransport): Promise<string> {
     unsubscribes.push(
       transport.onMessage(message => {
         if (message.t === "resume") {
-          finish(() => resolve(message.session));
+          finish(() => resolve({ session: message.session, role: message.role ?? "guest" }));
         } else if (message.t === "bye") {
           finish(() =>
             reject(
@@ -171,4 +191,64 @@ export function waitForCoopResume(transport: CoopTransport): Promise<string> {
       }),
     );
   });
+}
+
+/**
+ * Resolve when a partner joins the room: a new client taking the partner's place, or (with an older relay) any pairing.
+ * @param acceptCurrent - Resolve at once if a partner is already there
+ * @throws If the connection closes first
+ */
+function waitForPartner(transport: CoopTransport, acceptCurrent: boolean): Promise<void> {
+  const joined = (status: string | undefined) => status === "newPeer" || status === "connected";
+  if (acceptCurrent && joined(transport.status)) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const unsubscribe = transport.onStatusChange(status => {
+      if (joined(status)) {
+        unsubscribe();
+        resolve();
+      } else if (status === "closed") {
+        unsubscribe();
+        reject(new Error("the co-op connection closed while waiting for the partner"));
+      }
+    });
+  });
+}
+
+/**
+ * The player who stayed in a held room: wait until the partner comes back, run the handshake and, for a run, check it is
+ * the partner saved with it and send the wave start save (the caller loads it too, see {@linkcode resumeCoopRun}).
+ * Anyone else who joins is sent away, and the room keeps waiting.
+ * @throws If the connection closes, or the partner runs another game version
+ */
+export async function waitForReturningPartner(
+  room: HeldCoopRoom,
+  local: CoopLocalInfo = getLocalCoopInfo(),
+): Promise<CoopConnection> {
+  const saved = room.save === null ? null : (JSON.parse(room.save) as Pick<SessionSaveData, "coop">);
+  const partnerRole: CoopRole = room.role === "host" ? "guest" : "host";
+  for (let first = true; ; first = false) {
+    await waitForPartner(room.transport, first);
+    let partner: CoopHandshakeResult;
+    try {
+      partner = await performHandshake(room.transport, { ...local, resume: saved !== null });
+    } catch (error) {
+      if (error instanceof CoopVersionMismatchError || room.transport.status === "closed") {
+        throw error;
+      }
+      // A client that does not answer (such as the old partner's page, still in the run): send it away.
+      room.transport.send({ t: "bye" });
+      continue;
+    }
+    if (saved && !isSavedPartner(saved, partner, partnerRole)) {
+      room.transport.send({ t: "bye", reason: "wrongAccount" });
+      continue;
+    }
+    const transport = new ReliableCoopTransport(room.transport);
+    if (room.save !== null) {
+      transport.send({ t: "resume", session: room.save, role: partnerRole });
+    }
+    return { role: room.role, transport, ...partner };
+  }
 }

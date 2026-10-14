@@ -122,6 +122,26 @@ describe("ReliableCoopTransport", () => {
     expect(frames.filter(f => f.t === "checksum").map(f => f.n)).toEqual([17, 18, 19, 20]);
   });
 
+  it("hands the connection over once released", async () => {
+    const { pair, host, received } = await reliablePair();
+    const frames = rawFrames(pair.guest);
+    const inner = host.release();
+    expect(inner).toBe(pair.host);
+
+    host.send(checksum(1));
+    host.close();
+    pair.guest.send({ t: "bye" });
+    await flush();
+
+    expect(frames).toEqual([]);
+    expect(received.host).toEqual([]);
+    expect(pair.host.status).toBe("connected");
+    // What arrives now waits for whoever listens to the connection next.
+    const next: CoopMessage[] = [];
+    pair.host.onMessage(m => next.push(m));
+    expect(next).toEqual([{ t: "bye" }]);
+  });
+
   it("reports the connection's status", async () => {
     const { pair, host } = await reliablePair();
     const statuses: string[] = [];

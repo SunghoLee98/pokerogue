@@ -183,6 +183,50 @@ describe("RelayWebSocketTransport", () => {
     expect(statuses.at(-1)).toBe("connected");
   });
 
+  it("reports a new peer when another client takes the partner's place", async () => {
+    await hostAndPair();
+    expect(transport.joinCode).toBe("ABC123");
+    latest().emitControl({ t: "relay:peerLeft" });
+    latest().emitControl({ t: "relay:paired", fresh: true });
+    expect(statuses.at(-1)).toBe("newPeer");
+    expect(transport.status).toBe("newPeer");
+  });
+
+  it("treats the first pairing as connected even when the relay marks it fresh", async () => {
+    const hosting = transport.host();
+    latest().emitOpen();
+    latest().emitControl({ t: "relay:code", code: "ABC123" });
+    await hosting;
+    latest().emitControl({ t: "relay:paired", fresh: true });
+    expect(statuses.at(-1)).toBe("connected");
+  });
+
+  it("rejoins the slot the relay gave instead of its role", async () => {
+    const joining = transport.join("ABC123");
+    latest().emitOpen();
+    latest().emitControl({ t: "relay:slot", slot: "host" });
+    latest().emitControl({ t: "relay:paired" });
+    await joining;
+
+    latest().emitClose();
+    vi.advanceTimersByTime(2_000);
+    expect(latest().url).toBe("wss://relay.test?code=ABC123&rejoin=host");
+  });
+
+  it("stops retrying once back in a room the partner is away from", async () => {
+    await hostAndPair();
+    latest().emitControl({ t: "relay:peerLeft" });
+    latest().emitClose();
+    vi.advanceTimersByTime(2_000);
+    latest().emitOpen();
+    latest().emitControl({ t: "relay:waiting" });
+
+    vi.advanceTimersByTime(120_000);
+    expect(statuses.at(-1)).toBe("reconnecting");
+    latest().emitControl({ t: "relay:paired", fresh: true });
+    expect(statuses.at(-1)).toBe("newPeer");
+  });
+
   it("gives up after sixty seconds", async () => {
     await hostAndPair();
     latest().emitClose();

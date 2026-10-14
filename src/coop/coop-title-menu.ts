@@ -5,14 +5,17 @@
 
 import { globalScene } from "#app/global-scene";
 import { type CoopConnection, CoopJoinInputError, hostCoop, joinCoop } from "#coop/coop-connect";
+import { takeHeldCoopRoom } from "#coop/coop-exit";
 import { CoopVersionMismatchError } from "#coop/coop-handshake";
 import { openCoopLobby } from "#coop/coop-lobby";
+import type { CoopRole } from "#coop/coop-protocol";
 import {
   CoopWrongAccountError,
   hostCoopResume,
   readCoopSave,
   resumeCoopRun,
   waitForCoopResume,
+  waitForReturningPartner,
 } from "#coop/coop-resume";
 import { coopText } from "#coop/coop-text";
 import type { CoopTransport } from "#coop/coop-transport";
@@ -113,19 +116,31 @@ export async function showCoopTitleMenu(callbacks: CoopTitleMenuCallbacks): Prom
   globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options, yOffset: 48 });
 }
 
-/** Load the saved run on this client and continue from the title screen. */
-async function resume(connection: CoopConnection, json: string, callbacks: CoopTitleMenuCallbacks): Promise<void> {
+/**
+ * Load the saved run on this client and continue from the title screen.
+ * @param role - Our role in the run; by default the connection's
+ */
+async function resume(
+  connection: CoopConnection,
+  json: string,
+  callbacks: CoopTitleMenuCallbacks,
+  role: CoopRole = connection.role,
+): Promise<void> {
   globalScene.ui.setMode(UiMode.MESSAGE);
   globalScene.ui.resetModeChain();
-  await resumeCoopRun(connection.role, connection.transport, json);
+  await resumeCoopRun(role, connection.transport, json);
   globalScene.ui.clearText();
   callbacks.onResumed();
 }
 
 /** Show a join code with a cancel button while waiting for the partner. */
-function showJoinCode(code: string, cancel: () => void): void {
+function showJoinCode(
+  code: string,
+  cancel: () => void,
+  text: "waitingForPartner" | "waitingForPartnerReturn" = "waitingForPartner",
+): void {
   const { ui } = globalScene;
-  ui.showText(coopText("waitingForPartner", { code }), null, () => {
+  ui.showText(coopText(text, { code }), null, () => {
     const options: OptionSelectItem[] = [
       {
         label: i18next.t("menu:cancel"),
@@ -137,6 +152,45 @@ function showJoinCode(code: string, cancel: () => void): void {
     ];
     ui.setOverlayMode(UiMode.OPTION_SELECT, { options, yOffset: 48 });
   });
+}
+
+/**
+ * Open the room kept for a partner who dropped out (see `takeHeldCoopRoom`): show its join code again until the partner
+ * comes back, then continue the run from the start of the wave (or go back to the lobby).
+ * @returns Whether a room was kept; if not, the caller shows the title screen as usual
+ */
+export function showHeldCoopRoom(callbacks: CoopTitleMenuCallbacks): boolean {
+  const room = takeHeldCoopRoom();
+  if (!room) {
+    return false;
+  }
+  let cancelled = false;
+  const cancel = () => {
+    cancelled = true;
+    room.transport.close();
+    callbacks.onCancel();
+  };
+
+  globalScene.ui.setMode(UiMode.MESSAGE);
+  showJoinCode(room.code, cancel, "waitingForPartnerReturn");
+  waitForReturningPartner(room)
+    .then(connection => {
+      if (cancelled) {
+        return;
+      }
+      if (room.save === null) {
+        enterLobby(connection, callbacks);
+        return;
+      }
+      return resume(connection, room.save, callbacks);
+    })
+    .catch(error => {
+      if (!cancelled) {
+        room.transport.close();
+        showFailure(error, callbacks);
+      }
+    });
+  return true;
 }
 
 /** Host the saved run: a join code, the saved partner joins, both load the save. */
@@ -224,10 +278,11 @@ function showJoinForm(callbacks: CoopTitleMenuCallbacks): void {
               enterLobby(connection, callbacks);
               return;
             }
-            // The host continues a saved run: no lobby, wait for the save.
+            // The partner continues a saved run: no lobby, wait for the save.
             ui.showText(coopText("loadingSavedRun"));
             try {
-              await resume(connection, await waitForCoopResume(connection.transport), callbacks);
+              const { session, role } = await waitForCoopResume(connection.transport);
+              await resume(connection, session, callbacks, role);
             } catch (error) {
               connection.transport.close();
               throw error;

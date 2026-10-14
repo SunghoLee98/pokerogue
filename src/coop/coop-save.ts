@@ -10,6 +10,7 @@ import { COOP_PROTOCOL_VERSION, type CoopAccountSnapshot, type CoopRole } from "
 import { getCoopRewardCounters } from "#coop/coop-reward";
 import { COOP_SESSION_SLOT, type CoopSession, coopSession } from "#coop/coop-session";
 import type { GameData } from "#system/game-data";
+import type { SessionSaveData } from "#types/save-data";
 
 /** What a co-op run saves besides the solo session fields. Only the host's account keeps the save. */
 export interface CoopSessionSaveData {
@@ -80,14 +81,30 @@ export function getCoopSaveFields(): { coop?: CoopSessionSaveData } {
   return coopSession ? { coop: createCoopSaveData(coopSession) } : {};
 }
 
+/** Keep a wave start save in the session, for a partner who comes back (see {@linkcode CoopSession.waveStartSave}). */
+export function rememberCoopWaveStart(data: SessionSaveData): void {
+  if (coopSession) {
+    coopSession.waveStartSave = JSON.stringify(data);
+  }
+}
+
 /**
  * The save a co-op guest makes in place of `GameData.saveAll` (spec 3.8: only the host keeps the session).
  * The guest's account data (dex, candies, eggs...) is still saved, the same way and as often as in solo.
+ * The session is only kept in memory, for a host who comes back.
+ * @param useCachedSession - The save repeats the last one instead of saving the current state
  * @returns `null` outside the guest's client, where `saveAll` saves as usual
  */
-export function saveCoopGuestData(gameData: GameData, sync: boolean): Promise<boolean> | null {
+export function saveCoopGuestData(
+  gameData: GameData,
+  sync: boolean,
+  useCachedSession = false,
+): Promise<boolean> | null {
   if (coopSession?.localRole !== "guest") {
     return null;
+  }
+  if (!useCachedSession) {
+    rememberCoopWaveStart(gameData.getSessionSaveData());
   }
   // `saveSystem` stores locally and, online, on the server; without `sync` solo only stores locally.
   return sync || bypassLogin ? gameData.saveSystem() : Promise.resolve(true);

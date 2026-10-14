@@ -18,6 +18,12 @@ export class LoopbackTransport implements CoopTransport {
   private peer: LoopbackTransport;
   /** While dropped, messages are lost as over a broken connection. */
   private dropped = false;
+  /** Unset unless a test sets it, as a relay room's code */
+  joinCode: string | null = null;
+
+  get status(): CoopConnectionStatus {
+    return this.listeners.status;
+  }
 
   link(peer: LoopbackTransport): void {
     this.peer = peer;
@@ -73,6 +79,22 @@ export class LoopbackTransport implements CoopTransport {
     }
     this.dropped = dropped;
     this.listeners.setStatus(dropped ? "reconnecting" : "connected");
+  }
+
+  /** Test control: a new client takes the partner's place, as a reloaded page joining the relay room again. */
+  acceptNewPeer(peer: LoopbackTransport): void {
+    // The old partner's client is gone: what it still sends is lost.
+    this.peer.listeners.setStatus("closed");
+    this.link(peer);
+    peer.link(this);
+    this.dropped = false;
+    peer.listeners.setStatus("connected");
+    this.listeners.setStatus("newPeer");
+  }
+
+  /** Test control: the partner's client is gone; this end waits for another one. */
+  losePeer(): void {
+    this.listeners.setStatus("reconnecting");
   }
 
   private get isClosed(): boolean {

@@ -6,27 +6,22 @@ import type { RelaySlot } from "./relay-protocol.ts";
 /** No 0/O or 1/I: they look alike in the game font. */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 6;
-/** A room nobody joined is dropped after this long. */
-const UNJOINED_ROOM_TTL_MS = 10 * 60_000;
-/** A player who dropped can rejoin their slot for this long. */
-const VACATED_SLOT_TTL_MS = 60_000;
-
-interface Slot {
-  present: boolean;
-  /** When the slot was last vacated, or `null` if it never was. */
-  vacatedAt: number | null;
-}
+/** A room nobody is in is dropped after this long, so players who all dropped at once can still rejoin. */
+const EMPTY_ROOM_TTL_MS = 60_000;
 
 interface Room {
-  createdAt: number;
-  host: Slot;
-  guest: Slot;
-  guestEverJoined: boolean;
+  present: Record<RelaySlot, boolean>;
+  /** When the last player left, or `null` while someone is in the room. */
+  emptySince: number | null;
 }
 
-export type JoinResult = "ok" | "notFound" | "full";
+/** The slot a join took, or why it failed. */
+export type JoinResult = RelaySlot | "notFound" | "full";
 
-/** Tracks rooms and who is in them. Holds no sockets, so it can be tested with an injected clock. */
+/**
+ * Tracks rooms and who is in them. Holds no sockets, so it can be tested with an injected clock.
+ * A room stays open as long as one player is in it: whoever stays can wait for the partner to come back.
+ */
 export class RoomRegistry {
   private readonly rooms = new Map<string, Room>();
   private readonly now: () => number;
@@ -43,60 +38,50 @@ export class RoomRegistry {
     do {
       code = this.generateCode();
     } while (this.rooms.has(code));
-    this.rooms.set(code, {
-      createdAt: this.now(),
-      host: { present: true, vacatedAt: null },
-      guest: { present: false, vacatedAt: null },
-      guestEverJoined: false,
-    });
+    this.rooms.set(code, { present: { host: true, guest: false }, emptySince: null });
     return code;
   }
 
-  join(code: string, slot: RelaySlot = "guest"): JoinResult {
+  /**
+   * Take a slot in a room.
+   * @param slot - The slot to take back after a dropped connection; omitted, the guest slot or else the host slot
+   */
+  join(code: string, slot?: RelaySlot): JoinResult {
     const room = this.rooms.get(code);
     if (!room) {
       return "notFound";
     }
-    if (room[slot].present) {
+    const taken = slot ?? (room.present.guest ? "host" : "guest");
+    if (room.present[taken]) {
       return "full";
     }
-    room[slot] = { present: true, vacatedAt: null };
-    if (slot === "guest") {
-      room.guestEverJoined = true;
-    }
-    return "ok";
+    room.present[taken] = true;
+    room.emptySince = null;
+    return taken;
   }
 
   leave(code: string, slot: RelaySlot): void {
     const room = this.rooms.get(code);
-    if (room?.[slot].present) {
-      room[slot] = { present: false, vacatedAt: this.now() };
+    if (!room?.present[slot]) {
+      return;
+    }
+    room.present[slot] = false;
+    if (!room.present.host && !room.present.guest) {
+      room.emptySince = this.now();
     }
   }
 
-  /** Remove expired rooms. @returns The codes that were removed */
+  /** Remove rooms nobody came back to. @returns The codes that were removed */
   sweep(): string[] {
     const now = this.now();
     const expired: string[] = [];
     for (const [code, room] of this.rooms) {
-      if (this.isExpired(room, now)) {
+      if (room.emptySince !== null && now - room.emptySince >= EMPTY_ROOM_TTL_MS) {
         this.rooms.delete(code);
         expired.push(code);
       }
     }
     return expired;
-  }
-
-  private isExpired(room: Room, now: number): boolean {
-    if (!room.host.present && !room.guest.present) {
-      return true;
-    }
-    if (!room.guestEverJoined && now - room.createdAt >= UNJOINED_ROOM_TTL_MS) {
-      return true;
-    }
-    return [room.host, room.guest].some(
-      slot => !slot.present && slot.vacatedAt !== null && now - slot.vacatedAt >= VACATED_SLOT_TTL_MS,
-    );
   }
 
   private generateCode(): string {

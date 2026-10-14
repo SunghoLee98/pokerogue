@@ -48,7 +48,7 @@ describe("RoomRegistry", () => {
   it("lets a guest join once", () => {
     const registry = new RoomRegistry();
     const code = registry.createRoom();
-    assert.equal(registry.join(code), "ok");
+    assert.equal(registry.join(code), "guest");
   });
 
   it("rejects a third client", () => {
@@ -64,49 +64,49 @@ describe("RoomRegistry", () => {
     assert.equal(registry.join("ZZZZZZ"), "notFound");
   });
 
-  it("expires an unjoined room after ten minutes", () => {
-    const clock = createClock();
-    const registry = new RoomRegistry(clock.now);
-    const code = registry.createRoom();
-    clock.advance(599_999);
-    assert.deepEqual(registry.sweep(), []);
-    clock.advance(1);
-    assert.deepEqual(registry.sweep(), [code]);
-    assert.equal(registry.join(code), "notFound");
-  });
-
-  it("keeps a vacated slot for sixty seconds", () => {
-    const clock = createClock();
-    const registry = new RoomRegistry(clock.now);
-    const kept = registry.createRoom();
-    registry.join(kept);
-    registry.leave(kept, "guest");
-    clock.advance(59_999);
-    assert.deepEqual(registry.sweep(), []);
-    assert.equal(registry.join(kept, "guest"), "ok");
-
-    const dropped = registry.createRoom();
-    registry.join(dropped);
-    registry.leave(dropped, "guest");
-    clock.advance(60_000);
-    assert.deepEqual(registry.sweep(), [dropped]);
-  });
-
-  it("does not expire a paired room", () => {
-    const clock = createClock();
-    const registry = new RoomRegistry(clock.now);
+  it("gives a plain join the host slot when only the guest stayed", () => {
+    const registry = new RoomRegistry();
     const code = registry.createRoom();
     registry.join(code);
-    clock.advance(60 * 60_000);
-    assert.deepEqual(registry.sweep(), []);
+    registry.leave(code, "host");
+    assert.equal(registry.join(code), "host");
   });
 
-  it("removes a room immediately once both players leave", () => {
+  it("lets a player take back their own slot", () => {
     const registry = new RoomRegistry();
     const code = registry.createRoom();
     registry.join(code);
     registry.leave(code, "guest");
+    assert.equal(registry.join(code, "host"), "full");
+    assert.equal(registry.join(code, "guest"), "guest");
+  });
+
+  it("keeps a room open as long as one player is in it", () => {
+    const clock = createClock();
+    const registry = new RoomRegistry(clock.now);
+    const waiting = registry.createRoom();
+    const left = registry.createRoom();
+    registry.join(left);
+    registry.leave(left, "guest");
+    clock.advance(60 * 60_000);
+    assert.deepEqual(registry.sweep(), []);
+    assert.equal(registry.join(waiting), "guest");
+    assert.equal(registry.join(left), "guest");
+  });
+
+  it("keeps an empty room for sixty seconds", () => {
+    const clock = createClock();
+    const registry = new RoomRegistry(clock.now);
+    const code = registry.createRoom();
+    registry.join(code);
+    registry.leave(code, "guest");
     registry.leave(code, "host");
+    clock.advance(59_999);
+    assert.deepEqual(registry.sweep(), []);
+    assert.equal(registry.join(code, "host"), "host");
+    registry.leave(code, "host");
+    clock.advance(60_000);
     assert.deepEqual(registry.sweep(), [code]);
+    assert.equal(registry.join(code), "notFound");
   });
 });
