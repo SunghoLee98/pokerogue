@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 SunghoLee98
+
+SPDX-License-Identifier: CC-BY-NC-SA-4.0
+-->
+
 # 협동 모드 7단계: 계정 진행도와 기록 Implementation Plan
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. 각 Task는 실패하는 테스트 → 실패 확인 → 구현 → 통과 확인 → 커밋 순서로 진행한다. 로직을 테스트보다 먼저 쓰지 않는다(4단계 메모 5번, 5단계 메모 5번의 순서 위반을 반복하지 않는다).

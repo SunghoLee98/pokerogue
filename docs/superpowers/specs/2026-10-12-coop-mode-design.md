@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 SunghoLee98
+
+SPDX-License-Identifier: CC-BY-NC-SA-4.0
+-->
+
 # 협동(Co-op) 모드 설계
 
 - 작성일: 2026-10-12
