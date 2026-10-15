@@ -12,7 +12,7 @@ import type { SpeciesId } from "#enums/species-id";
 import type { Variant } from "#sprites/variant";
 
 /** Bumped whenever a message shape changes incompatibly. Peers with different versions refuse to connect. */
-export const COOP_PROTOCOL_VERSION = 6;
+export const COOP_PROTOCOL_VERSION = 7;
 
 export type CoopRole = "host" | "guest";
 
@@ -120,6 +120,14 @@ export type CoopRewardAction =
   | { kind: "transfer"; from: number; itemIndex: number; quantity: number; to: number }
   | { kind: "skip" };
 
+/**
+ * Where a player's cursor is, for the partner to show (spec 4.7): a species on the starter select grid,
+ * or an option on reward screen `gen` (`row` and `cursor` as the reward screen counts them).
+ */
+export type CoopCursorAt =
+  | { screen: "starter"; speciesId: number }
+  | { screen: "reward"; gen: number; row: number; cursor: number };
+
 // Payloads below are narrowed by later co-op plans.
 export type TurnCommandPayload = CoopTurnCommandPayload;
 export type CoopChoiceKind = string;
@@ -175,6 +183,8 @@ type CoopMessageBody =
   | { t: "choice"; kind: CoopChoiceKind; wave: number; payload: unknown }
   /** A hint for the partner: "pick this one". `row` and `cursor` on the reward screen, `index` in a list. */
   | { t: "ping"; kind: "reward" | "option" | "encounter"; payload: { row?: number; cursor?: number; index?: number } }
+  /** Where the sender's cursor is now, `null` while it is on nothing the partner can see. Changes nothing in the run. */
+  | { t: "cursor"; at: CoopCursorAt | null }
   | { t: "checksum"; wave: number; turn: number; hash: string }
   /**
    * A reward screen action (spec 3.5, generalizing `shopBuy`). `gen` is the reward screen the requester saw and `req`
@@ -215,6 +225,7 @@ const COOP_MESSAGE_KINDS = [
   "turnCommand",
   "choice",
   "ping",
+  "cursor",
   "checksum",
   "reward",
   "confirm",

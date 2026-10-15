@@ -7,6 +7,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { CoopStarterCursorShare, type CoopStarterCursorView } from "#coop/coop-cursor";
 import { coopLobby } from "#coop/coop-lobby";
 import type { CoopStarterPayload } from "#coop/coop-protocol";
 import { buildStarterPayload } from "#coop/coop-starter-payload";
@@ -38,6 +39,8 @@ export interface CoopStarterSelectOptions {
   getCost?(starters: readonly Starter[]): number;
   /** Called when the partner's party changes the local player's point limit */
   onLimitChange?(): void;
+  /** Shares the cursor with the partner; disposed with the controller */
+  cursor?: CoopStarterCursorShare;
 }
 
 export class CoopStarterSelectController {
@@ -47,6 +50,7 @@ export class CoopStarterSelectController {
   private readonly getSharedLimit: () => number;
   private readonly getCost: (starters: readonly Starter[]) => number;
   private readonly onLimitChange: () => void;
+  private readonly cursor: CoopStarterCursorShare | null;
   private readonly unsubscribes: Unsubscribe[];
   /** The starters of the last ready, handed to the start callback */
   private confirmedStarters: Starter[] = [];
@@ -73,6 +77,7 @@ export class CoopStarterSelectController {
     this.getCost =
       options.getCost ?? (starters => getPartyValue(starters.map(starter => starter.speciesId as StarterSpeciesId)));
     this.onLimitChange = options.onLimitChange ?? (() => {});
+    this.cursor = options.cursor ?? null;
     this.unsubscribes = [
       selection.onChange(() => this.render()),
       selection.onStart(() => onStart(this.confirmedStarters)),
@@ -142,10 +147,23 @@ export class CoopStarterSelectController {
     return true;
   }
 
+  /** The local cursor is now on this species (`null`: not on the starter grid); the partner is told if it moved. */
+  shareCursor(speciesId: number | null): void {
+    if (!this.selection.startInfo && !this.selection.closed) {
+      this.cursor?.report(speciesId);
+    }
+  }
+
+  /** Draw the partner's cursor again, after the local grid scrolled or was filtered. */
+  refreshPartnerCursor(): void {
+    this.cursor?.refresh();
+  }
+
   destroy(): void {
     for (const unsubscribe of this.unsubscribes) {
       unsubscribe();
     }
+    this.cursor?.dispose();
     this.view.destroy();
   }
 
@@ -183,6 +201,8 @@ export interface CoopStarterSelectLayout {
   statusPosition: [x: number, y: number];
   /** The co-op objects are drawn just below this child of the container, so the screen's later layers cover them */
   drawBelow: Phaser.GameObjects.GameObject;
+  /** Shows the partner's cursor on the starter grid */
+  cursorView?: CoopStarterCursorView;
 }
 
 /** Draws the partner's picks as icons in the free team slots and the status as text. */
@@ -254,5 +274,14 @@ export function createCoopStarterSelectUi(
     return null;
   }
   const view = new PhaserCoopPartnerView(container, layout, 3);
-  return new CoopStarterSelectController(coopLobby.selection, view, onStart, { onLimitChange });
+  const { transport } = coopLobby;
+  const options: CoopStarterSelectOptions = { onLimitChange };
+  if (layout.cursorView) {
+    options.cursor = new CoopStarterCursorShare(
+      message => transport.send(message),
+      handler => transport.onMessage(handler),
+      layout.cursorView,
+    );
+  }
+  return new CoopStarterSelectController(coopLobby.selection, view, onStart, options);
 }

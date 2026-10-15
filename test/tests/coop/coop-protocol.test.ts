@@ -66,6 +66,8 @@ describe("coop-protocol", () => {
         payload: { kind: "capture", seq: 1, action: "replace", releasedId: 7, insertIndex: 2 },
       },
       { t: "ping", kind: "reward", payload: { row: 1, cursor: 0 } },
+      { t: "cursor", at: { screen: "starter", speciesId: 1 } },
+      { t: "cursor", at: null },
       { t: "checksum", wave: 2, turn: 1, hash: "abc" },
       { t: "reward", wave: 3, gen: 1, req: 0, by: "guest", action: { kind: "shop", option: 1, slot: 4 } },
       {
@@ -116,8 +118,8 @@ describe("coop-protocol", () => {
     }
   });
 
-  it("is protocol 6", () => {
-    expect(COOP_PROTOCOL_VERSION).toBe(6);
+  it("is protocol 7", () => {
+    expect(COOP_PROTOCOL_VERSION).toBe(7);
   });
 
   it("returns null for malformed input", () => {

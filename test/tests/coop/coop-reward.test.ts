@@ -117,6 +117,28 @@ describe("co-op reward turns", () => {
     });
   });
 
+  it("shows each player where the other's cursor is", async () => {
+    const partner = await toRewardScreen("guest", 3);
+    handler().setRowCursor(1);
+    handler().setCursor(2);
+    await waitForCoop(() =>
+      partner.received.some(m => m.t === "cursor" && m.at?.screen === "reward" && m.at.row === 1 && m.at.cursor === 2),
+    );
+    expect(partner.received.filter(m => m.t === "cursor").at(-1)).toEqual({
+      t: "cursor",
+      at: { screen: "reward", gen: 0, row: 1, cursor: 2 },
+    });
+
+    partner.send({ t: "cursor", at: { screen: "reward", gen: 0, row: 1, cursor: 1 } });
+    await waitForCoop(() => handler()["partnerCursorObj"]?.visible);
+    const placement = handler()["getCursorPlacement"](1, 1);
+    expect(handler()["partnerCursorObj"]).toMatchObject({ x: placement.x, y: placement.y });
+
+    // A cursor on an older screen is not shown
+    partner.send({ t: "cursor", at: { screen: "reward", gen: -1, row: 1, cursor: 0 } });
+    await waitForCoop(() => !handler()["partnerCursorObj"]?.visible);
+  });
+
   it("applies the picker's reward on the other client", async () => {
     const partner = await toRewardScreen("guest", 3);
     partner.send({ t: "reward", wave: 3, gen: 0, req: 0, by: "host", seq: 0, action: { kind: "reward", option: 2 } });

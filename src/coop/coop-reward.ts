@@ -16,6 +16,7 @@ import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { activeOverrides } from "#app/overrides";
 import { hideCoopBanner, showCoopBanner } from "#coop/coop-banner";
+import { setCoopRewardCursorGen } from "#coop/coop-cursor";
 import type { CoopRewardMessage } from "#coop/coop-input-broker";
 import { listenForCoopPings, sendCoopPing } from "#coop/coop-ping";
 import type { CoopRewardAction } from "#coop/coop-protocol";
@@ -120,6 +121,7 @@ export function openCoopRewardScreen(phase: SelectModifierPhase): void {
   const state = getState(session);
   state.gen++;
   state.screen = { phase, gen: state.gen, pending: null, callback: null };
+  setCoopRewardCursorGen(state.gen);
   if (isPicker(session)) {
     hideCoopBanner();
   } else {

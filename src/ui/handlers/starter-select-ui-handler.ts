@@ -13,6 +13,7 @@ import {
   getValueReductionCandyCounts,
   POKERUS_STARTER_COUNT,
 } from "#balance/starters";
+import { addCoopPartnerCursor } from "#coop/coop-cursor";
 import { getStarterPickLimit } from "#coop/coop-starter-rules";
 import {
   type CoopStarterSelectController,
@@ -214,6 +215,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   private starterSelectCallback: StarterSelectCallback | null;
   private coopUi: CoopStarterSelectController | null = null;
+  /** The co-op partner's cursor on the starter grid, made when first shown */
+  private coopPartnerCursorObj: Phaser.GameObjects.Image | null = null;
+  /** The starter grid, with its cursors */
+  private starterBoxContainer: Phaser.GameObjects.Container;
 
   private starterPreferences: AllStarterPreferences;
   private originalStarterPreferences: AllStarterPreferences;
@@ -259,6 +264,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.partyColumn = this.setupPartyColumn();
 
     const starterBoxContainer = globalScene.add.container(speciesContainerX + 6, 9); //115
+    this.starterBoxContainer = starterBoxContainer;
 
     this.starterSelectScrollBar = new ScrollBar(161, 12, 5, 155, 9);
 
@@ -637,6 +643,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       statusPosition: [teamWindowX - 11, 144],
       // Above the team column and the starter grid, below the panels, overlays and message box drawn after them
       drawBelow: this.starterSummary,
+      cursorView: { showPartnerCursor: speciesId => this.showCoopPartnerCursor(speciesId) },
     };
     this.coopUi = createCoopStarterSelectUi(
       this.starterSelectContainer,
@@ -649,6 +656,29 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       },
       () => this.tryUpdateValue(),
     );
+    this.coopUi?.shareCursor(this.getCoopCursorSpecies());
+  }
+
+  /** The species under the cursor on the starter grid, `null` when the cursor is elsewhere (co-op shares it). */
+  private getCoopCursorSpecies(): number | null {
+    const container = this.starterContainers[this.cursor];
+    if (this.filterMode || !this.cursorObj.visible || !container?.visible) {
+      return null;
+    }
+    return container.species?.speciesId ?? null;
+  }
+
+  /** Show the co-op partner's cursor on a species, if it is on the grid as the player sees it now. */
+  private showCoopPartnerCursor(speciesId: number | null): void {
+    const index =
+      speciesId === null ? -1 : this.starterContainers.findIndex(c => c.visible && c.species?.speciesId === speciesId);
+    if (index === -1) {
+      this.coopPartnerCursorObj?.setVisible(false);
+      return;
+    }
+    this.coopPartnerCursorObj ??= addCoopPartnerCursor(this.starterBoxContainer, this.cursorObj);
+    const pos = calcStarterContainerPosition(index);
+    this.coopPartnerCursorObj.setPosition(pos.x - 1, pos.y + 1).setVisible(true);
   }
 
   /** The starter point limit for the party: in co-op, what the partner's party left of the shared budget. */
@@ -2132,7 +2162,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (this.coopUi?.processInput(button)) {
       return true;
     }
+    const success = this.processScreenInput(button);
+    this.coopUi?.shareCursor(this.getCoopCursorSpecies());
+    return success;
+  }
 
+  private processScreenInput(button: Button): boolean {
     const ui = this.getUi();
 
     let success = false;
@@ -2660,6 +2695,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
       this.setUpgradeAnimation(container);
     });
+
+    this.coopUi?.refreshPartnerCursor();
   }
 
   public override setCursor(cursor: number): boolean {
