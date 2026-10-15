@@ -268,5 +268,20 @@ describe("co-op reward turns", () => {
         .some(o => o.name === "coop-ping"),
     ).toBe(false);
     expect(getCoopBannerText()).toBe(coopText("partnerPinged"));
+    // The pointing finger and the rings
+    const marker = handler()
+      .options[2].getAll()
+      .find(o => o.name === "coop-ping") as Phaser.GameObjects.Container;
+    expect(marker.getAll()).toHaveLength(4);
+
+    // A new ping moves the mark
+    const destroy = vi.spyOn(marker, "destroy");
+    partner.send({ t: "ping", kind: "reward", payload: { row: 1, cursor: 0 } });
+    await waitForCoop(() =>
+      handler()
+        .options[0].getAll()
+        .some(o => o.name === "coop-ping"),
+    );
+    expect(destroy).toHaveBeenCalled();
   });
 });
