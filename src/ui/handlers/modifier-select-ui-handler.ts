@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { activeOverrides } from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
+import { addCoopPartnerCursor, type CoopRewardCursorView, shareCoopRewardCursor } from "#coop/coop-cursor";
 import { allMoves } from "#data/data-lists";
 import { getPokeballAtlasKey } from "#data/pokeball";
 import { Button } from "#enums/buttons";
@@ -52,6 +53,11 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
   public shopOptionsRows: ModifierOption[][] = [];
 
   private cursorObj: Phaser.GameObjects.Image | null;
+  /** The co-op partner's cursor, while it is on this screen too */
+  private partnerCursorObj: Phaser.GameObjects.Image | null = null;
+  private readonly coopCursorView: CoopRewardCursorView = {
+    showPartnerCursor: at => this.showPartnerCursor(at),
+  };
 
   setup() {
     const ui = this.getUi();
@@ -543,39 +549,17 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
     const options = this.rowCursor === 1 ? this.options : this.shopOptionsRows.at(-(this.rowCursor - 1))!;
 
-    this.cursorObj.setScale(this.rowCursor === 1 ? 2 : this.rowCursor >= 2 ? 1.5 : 1);
+    const placement = this.getCursorPlacement(this.rowCursor, cursor);
+    this.cursorObj.setScale(placement.scale).setPosition(placement.x, placement.y);
+    shareCoopRewardCursor(this.coopCursorView, { row: this.rowCursor, cursor });
 
     // the modifier selection has been updated, always hide the overlay
     this.moveInfoOverlay.clear();
     if (this.rowCursor) {
       if (this.rowCursor === 1 && options.length === 0) {
         // Continue button when no shop items
-        this.cursorObj.setScale(1.25);
-        this.cursorObj.setPosition(
-          globalScene.scaledCanvas.width / 3 + 23,
-          -globalScene.scaledCanvas.height / 2
-            - (this.shopOptionsRows.length > 1 ? SINGLE_SHOP_ROW_YOFFSET - 2 : DOUBLE_SHOP_ROW_YOFFSET - 2),
-        );
         ui.showText(i18next.t("modifierSelectUiHandler:continueNextWaveDescription"));
         return ret;
-      }
-
-      const sliceWidth = globalScene.scaledCanvas.width / (options.length + 2);
-      if (this.rowCursor < 2) {
-        // Cursor on free items
-        this.cursorObj.setPosition(
-          sliceWidth * (cursor + 1) + sliceWidth * 0.5 - 20,
-          -globalScene.scaledCanvas.height / 2
-            - (this.shopOptionsRows.length > 1 ? SINGLE_SHOP_ROW_YOFFSET - 2 : DOUBLE_SHOP_ROW_YOFFSET - 2),
-        );
-      } else {
-        // Cursor on paying items
-        this.cursorObj.setPosition(
-          sliceWidth * (cursor + 1) + sliceWidth * 0.5 - 16,
-          -globalScene.scaledCanvas.height / 2
-            - globalScene.game.canvas.height / 32
-            - (-14 + 28 * (this.rowCursor - (this.shopOptionsRows.length - 1))),
-        );
       }
 
       const type = options[this.cursor].modifierTypeOption.type;
@@ -600,29 +584,87 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         }
       }
     } else if (cursor === 0) {
-      this.cursorObj.setPosition(
-        6,
-        this.lockRarityButtonContainer.visible ? OPTION_BUTTON_YPOSITION - 11 : OPTION_BUTTON_YPOSITION + 1,
-      );
       ui.showText(i18next.t("modifierSelectUiHandler:rerollDesc"));
     } else if (cursor === 1) {
-      this.cursorObj.setPosition(
-        (globalScene.game.canvas.width - this.transferButtonWidth - this.checkButtonWidth) / 6 - 30,
-        OPTION_BUTTON_YPOSITION + 1,
-      );
       ui.showText(i18next.t("modifierSelectUiHandler:manageItemsDesc"));
     } else if (cursor === 2) {
-      this.cursorObj.setPosition(
-        (globalScene.game.canvas.width - this.checkButtonWidth) / 6 - 10,
-        OPTION_BUTTON_YPOSITION + 1,
-      );
       ui.showText(i18next.t("modifierSelectUiHandler:checkTeamDesc"));
     } else {
-      this.cursorObj.setPosition(6, OPTION_BUTTON_YPOSITION + 1);
       ui.showText(i18next.t("modifierSelectUiHandler:lockRaritiesDesc"));
     }
 
     return ret;
+  }
+
+  /** Where the cursor is drawn for an option, and at what scale. */
+  private getCursorPlacement(rowCursor: number, cursor: number): { x: number; y: number; scale: number } {
+    const rewardRowY =
+      -globalScene.scaledCanvas.height / 2
+      - (this.shopOptionsRows.length > 1 ? SINGLE_SHOP_ROW_YOFFSET - 2 : DOUBLE_SHOP_ROW_YOFFSET - 2);
+    if (rowCursor) {
+      const options = rowCursor === 1 ? this.options : this.shopOptionsRows.at(-(rowCursor - 1))!;
+      if (rowCursor === 1 && options.length === 0) {
+        // Continue button when no shop items
+        return { x: globalScene.scaledCanvas.width / 3 + 23, y: rewardRowY, scale: 1.25 };
+      }
+      const sliceWidth = globalScene.scaledCanvas.width / (options.length + 2);
+      if (rowCursor < 2) {
+        // Cursor on free items
+        return { x: sliceWidth * (cursor + 1) + sliceWidth * 0.5 - 20, y: rewardRowY, scale: 2 };
+      }
+      // Cursor on paying items
+      return {
+        x: sliceWidth * (cursor + 1) + sliceWidth * 0.5 - 16,
+        y:
+          -globalScene.scaledCanvas.height / 2
+          - globalScene.game.canvas.height / 32
+          - (-14 + 28 * (rowCursor - (this.shopOptionsRows.length - 1))),
+        scale: 1.5,
+      };
+    }
+    switch (cursor) {
+      case 0:
+        return {
+          x: 6,
+          y: this.lockRarityButtonContainer.visible ? OPTION_BUTTON_YPOSITION - 11 : OPTION_BUTTON_YPOSITION + 1,
+          scale: 1,
+        };
+      case 1:
+        return {
+          x: (globalScene.game.canvas.width - this.transferButtonWidth - this.checkButtonWidth) / 6 - 30,
+          y: OPTION_BUTTON_YPOSITION + 1,
+          scale: 1,
+        };
+      case 2:
+        return {
+          x: (globalScene.game.canvas.width - this.checkButtonWidth) / 6 - 10,
+          y: OPTION_BUTTON_YPOSITION + 1,
+          scale: 1,
+        };
+      default:
+        return { x: 6, y: OPTION_BUTTON_YPOSITION + 1, scale: 1 };
+    }
+  }
+
+  /** Show the co-op partner's cursor on an option of this screen, `null` to hide it. */
+  private showPartnerCursor(at: { row: number; cursor: number } | null): void {
+    const valid =
+      at !== null
+      && this.cursorObj !== null
+      && at.row >= 0
+      && at.row <= this.shopOptionsRows.length + 1
+      && at.cursor >= 0
+      // The button row has a fourth button (lock rarities); the reward row may be empty (continue button)
+      && at.cursor < Math.max(this.getRowItems(at.row), at.row === 0 ? 4 : 1);
+    if (!valid) {
+      this.partnerCursorObj?.setVisible(false);
+      return;
+    }
+    if (!this.partnerCursorObj?.active) {
+      this.partnerCursorObj = addCoopPartnerCursor(this.modifierContainer, this.cursorObj!);
+    }
+    const placement = this.getCursorPlacement(at.row, at.cursor);
+    this.partnerCursorObj.setScale(placement.scale).setPosition(placement.x, placement.y).setVisible(true);
   }
 
   setRowCursor(rowCursor: number): boolean {
@@ -777,6 +819,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
       this.cursorObj.destroy();
     }
     this.cursorObj = null;
+    this.partnerCursorObj?.destroy();
+    this.partnerCursorObj = null;
+    shareCoopRewardCursor(this.coopCursorView, null);
   }
 }
 

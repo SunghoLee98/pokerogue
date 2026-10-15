@@ -169,6 +169,48 @@ describe("co-op on the starter select screen", () => {
     expect(visible()).toEqual([true, true, true]);
   });
 
+  it("shows the partner's cursor on the species they point at and shares the player's own", async () => {
+    const { pair } = await setUp();
+    const received: unknown[] = [];
+    pair.host.onMessage(message => received.push(message));
+    // The grid is filled when the screen is shown, which cannot happen headless: show one species in slot 4
+    const containers = handler["starterContainers"];
+    containers.forEach((container, i) => container.setVisible(i === 4));
+    const speciesId = containers[4].species.speciesId;
+
+    pair.host.send({ t: "cursor", at: { screen: "starter", speciesId } });
+    await flush();
+    const partnerCursor = handler["coopPartnerCursorObj"]!;
+    expect(partnerCursor).toBeTruthy();
+    const box = handler["starterBoxContainer"];
+    expect(box.getIndex(partnerCursor)).toBe(box.getIndex(handler.cursorObj) - 1);
+    const setVisible = vi.spyOn(partnerCursor, "setVisible");
+    const setPosition = vi.spyOn(partnerCursor, "setPosition");
+
+    // Scrolled out of view as the player sees the grid
+    containers[4].setVisible(false);
+    handler["coopUi"]?.refreshPartnerCursor();
+    expect(setVisible).toHaveBeenLastCalledWith(false);
+    containers[4].setVisible(true);
+    handler["coopUi"]?.refreshPartnerCursor();
+    expect(setVisible).toHaveBeenLastCalledWith(true);
+    expect(setPosition).toHaveBeenLastCalledWith(containers[4].x - 1, containers[4].y + 1);
+
+    pair.host.send({ t: "cursor", at: null });
+    await flush();
+    expect(setVisible).toHaveBeenLastCalledWith(false);
+
+    vi.spyOn(handler, "setCursor").mockImplementation(cursor => {
+      handler["cursor"] = cursor;
+      return true;
+    });
+    handler.setCursor(4);
+    handler.cursorObj.setVisible(true);
+    handler["coopUi"]?.shareCursor(handler["getCoopCursorSpecies"]());
+    await flush();
+    expect(received.at(-1)).toEqual({ t: "cursor", at: { screen: "starter", speciesId } });
+  });
+
   it("keeps the co-op status clear of the message box", async () => {
     const { added, addText } = await setUp();
     const container = handler["starterSelectContainer"];

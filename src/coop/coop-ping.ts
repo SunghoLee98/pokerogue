@@ -4,17 +4,22 @@
  * @module
  */
 
+import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { showCoopBanner } from "#coop/coop-banner";
 import type { CoopPingMessage } from "#coop/coop-input-broker";
+import { addCoopPingMarker } from "#coop/coop-ping-marker";
 import { type CoopSession, coopSession } from "#coop/coop-session";
 import { coopText } from "#coop/coop-text";
-import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
-import { addTextObject } from "#ui/text";
 
+/** The partner's ping on the reward screen */
 const MARKER_NAME = "coop-ping";
+/** The player's own ping, a short ripple that tells them it was sent */
+const SENT_MARKER_NAME = "coop-ping-sent";
+/** Half the height of a reward screen item, in the option's own units */
+const ITEM_HALF_HEIGHT = 16;
 
 type PingPayload = CoopPingMessage["payload"];
 
@@ -28,6 +33,9 @@ let listPingHandler: ListPingHandler | null = null;
 export function sendCoopPing(kind: CoopPingMessage["kind"], payload: PingPayload): void {
   coopSession?.inputs.send({ t: "ping", kind, payload });
   globalScene.ui.playSelect();
+  if (kind === "reward") {
+    markRewardOption(payload, false);
+  }
 }
 
 /** Show the partner's pings from now on (once per session). */
@@ -54,24 +62,40 @@ export function setCoopListPingHandler(handler: ListPingHandler | null): void {
 }
 
 /** Mark the pinged reward screen option, removing the previous mark. */
-function markRewardPing({ row, cursor }: PingPayload): void {
+function markRewardPing(payload: PingPayload): void {
+  if (markRewardOption(payload, true)) {
+    audioManager.playSound("se/shing", { volume: 0.6 });
+    showCoopBanner(coopText("partnerPinged"), true);
+  }
+}
+
+/**
+ * Put an animated ping marker on a reward screen option: the partner's (a pointing finger and rings, replacing their
+ * previous one) or the player's own (rings only).
+ * @returns Whether the option is on the screen
+ */
+function markRewardOption({ row, cursor }: PingPayload, fromPartner: boolean): boolean {
   if (globalScene.ui.mode !== UiMode.MODIFIER_SELECT || row === undefined || cursor === undefined) {
-    return;
+    return false;
   }
   const handler = globalScene.ui.getHandler() as ModifierSelectUiHandler;
   const rows = [handler.options, ...handler.shopOptionsRows.toReversed()];
   const option = rows[row - 1]?.[cursor];
   if (!option) {
-    return;
+    return false;
   }
+  const name = fromPartner ? MARKER_NAME : SENT_MARKER_NAME;
   for (const other of rows.flat()) {
     other
       .getAll()
-      .filter(o => o.name === MARKER_NAME)
+      .filter(o => o.name === name)
       .forEach(o => o.destroy());
   }
-  const marker = addTextObject(0, -34, "!", TextStyle.MONEY, { align: "center", fontSize: "96px" }).setOrigin(0.5, 0);
-  marker.setName(MARKER_NAME);
-  option.add(marker);
-  showCoopBanner(coopText("partnerPinged"), true);
+  addCoopPingMarker(option, name, {
+    x: 0,
+    y: 0,
+    handOffset: ITEM_HALF_HEIGHT * (option.scaleX || 1) + 2,
+    withHand: fromPartner,
+  });
+  return true;
 }

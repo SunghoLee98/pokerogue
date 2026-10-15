@@ -8,11 +8,12 @@
  *   by sequence number;
  * - answers to the local player's requests by kind and the number the request carried;
  * - picked encounter options in arrival order;
- * - reward screen events, owner requests and pings to whoever listens, keeping those that come early.
+ * - reward screen events, owner requests and pings to whoever listens, keeping those that come early;
+ * - the partner's cursor, keeping only where it is now.
  * @module
  */
 
-import type { CoopDecision, CoopDecisionKind, CoopMessage } from "#coop/coop-protocol";
+import type { CoopCursorAt, CoopDecision, CoopDecisionKind, CoopMessage } from "#coop/coop-protocol";
 import type { CoopTransport, Unsubscribe } from "#coop/coop-transport";
 
 type ConfirmMessage = Extract<CoopMessage, { t: "confirm" }>;
@@ -91,6 +92,8 @@ export class CoopInputBroker {
   private readonly rewards = new Mailbox<CoopRewardMessage>();
   private readonly pings = new Mailbox<CoopPingMessage>();
   private readonly choices = new Map<string, Mailbox<CoopChoiceMessage>>();
+  private cursor: CoopCursorAt | null = null;
+  private readonly cursorListeners = new Set<(at: CoopCursorAt | null) => void>();
   private readonly unsubscribe: Unsubscribe;
   /** Waits for the partner that have not been answered yet */
   private pendingWaits = 0;
@@ -184,6 +187,17 @@ export class CoopInputBroker {
     return this.choiceMailbox(kind).listen(handler);
   }
 
+  /** Where the partner's cursor is now, `null` while it is on nothing shared. */
+  get partnerCursor(): CoopCursorAt | null {
+    return this.cursor;
+  }
+
+  /** Be told whenever the partner's cursor moves. */
+  onCursor(handler: (at: CoopCursorAt | null) => void): Unsubscribe {
+    this.cursorListeners.add(handler);
+    return () => this.cursorListeners.delete(handler);
+  }
+
   /** Be told about every turn message as it arrives, after it was filed or handed to a waiting reader. */
   onTurnMessage(handler: (message: CoopTurnMessage) => void): Unsubscribe {
     this.turnListeners.add(handler);
@@ -247,6 +261,7 @@ export class CoopInputBroker {
     this.confirms.clear();
     this.confirmWaiters.clear();
     this.encounterOptionWaiters = [];
+    this.cursorListeners.clear();
   }
 
   private choiceMailbox(kind: string): Mailbox<CoopChoiceMessage> {
@@ -284,6 +299,12 @@ export class CoopInputBroker {
         break;
       case "ping":
         this.pings.deliver(message);
+        break;
+      case "cursor":
+        this.cursor = message.at;
+        for (const listener of [...this.cursorListeners]) {
+          listener(message.at);
+        }
         break;
     }
   }
